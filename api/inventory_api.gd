@@ -11,10 +11,10 @@ static func move_item(inventory: InventoryComponent, source_idx: int, target_idx
 	inventory.move_item(source_idx, target_idx)
 
 ## ใช้ไอเทมในช่องที่ระบุ
-static func use_item(inventory: InventoryComponent, index: int, user_node: Node) -> void:
+static func use_item(inventory: InventoryComponent, index: int, user_context: Dictionary = {}) -> void:
 	if not inventory:
 		return
-	inventory.use_item(index, user_node)
+	inventory.use_item(index, user_context)
 
 ## ทิ้งไอเทมลงพื้น (Emit signal ให้ตัวเกมเอาไปจัดการต่อ)
 static func drop_item(inventory: InventoryComponent, index: int, amount: int = -1) -> bool:
@@ -46,6 +46,44 @@ static func drop_item(inventory: InventoryComponent, index: int, amount: int = -
 	
 	# ให้เกมเอาไป spawn โมเดลที่พื้น
 	InventoryManager.item_dropped.emit(item, drop_amount, dropped_runtime_data)
+	return true
+
+## คราฟต์ไอเทมในกระเป๋า (Item Crafting)
+static func craft_items(inventory: InventoryComponent, registry: RecipeRegistry, slot_indices: Array[int]) -> bool:
+	if not inventory or not registry:
+		return false
+		
+	# ดึง ItemData ขึ้นมาเพื่อเทียบสูตร
+	var input_items: Array[ItemData] = []
+	for idx in slot_indices:
+		var slot = inventory.get_slot(idx)
+		if slot and slot.item:
+			input_items.append(slot.item)
+			
+	if input_items.is_empty():
+		return false
+		
+	# หาสูตรที่ตรง
+	var recipe = registry.find_recipe(input_items)
+	if not recipe:
+		return false
+		
+	# หักวัตถุดิบ
+	for idx in slot_indices:
+		var slot = inventory.get_slot(idx)
+		if slot and slot.item:
+			# ใช้ remove_item ธรรมดาไปก่อน หรือหัก amount (สำหรับ demo ง่ายๆ ให้หัก amount = 1)
+			slot.amount -= 1
+			if slot.amount <= 0:
+				inventory._set_occupied(idx, slot.item, true)
+				slot.item = null
+				slot.runtime_data.clear()
+				
+	# ยัดไอเทมผลลัพธ์ลงกระเป๋า
+	for _i in range(recipe.result_amount):
+		inventory.add_item(recipe.result_item)
+		
+	inventory.inventory_changed.emit()
 	return true
 
 ## แบ่งกองไอเทม

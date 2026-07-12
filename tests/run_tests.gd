@@ -17,6 +17,8 @@ const TEST_SUITES: Array[Script] = [
 	preload("res://addons/universal_inventory/tests/test_inventory_component.gd"),
 	preload("res://addons/universal_inventory/tests/test_equipment_component.gd"),
 	preload("res://addons/universal_inventory/tests/test_inventory_api.gd"),
+	preload("res://addons/universal_inventory/tests/test_condition_manager.gd"),
+	preload("res://addons/universal_inventory/tests/test_crafting.gd"),
 ]
 
 

@@ -104,7 +104,7 @@ func _init_module_select():
 	module_select.add_item("Weapon Module", 2)
 	module_select.add_item("Armor Module", 3)
 	module_select.add_item("Tool Module", 4)
-	module_select.add_item("Buff Module", 5)
+	module_select.add_item("Condition Module", 5)
 	module_select.add_item("Perishable Module", 6)
 
 # --- SEARCH & FILTER ---
@@ -366,7 +366,7 @@ func _on_add_module_button_pressed():
 		2: new_module = WeaponModule.new()
 		3: new_module = ArmorModule.new()
 		4: new_module = ToolModule.new()
-		5: new_module = BuffModule.new()
+		5: new_module = ConditionModule.new()
 		6: new_module = PerishableModule.new()
 		
 	if new_module:
@@ -489,9 +489,9 @@ func _create_module_editor_ui(module: ItemModule) -> Control:
 			pm.destroy_on_spoil = val
 			_save_current_item()
 		)
-	elif module is BuffModule:
-		var bm = module as BuffModule
-		_build_buff_module_ui(vbox, bm)
+	elif module is ConditionModule:
+		var bm = module as ConditionModule
+		_build_condition_module_ui(vbox, bm)
 		
 	return panel
 
@@ -567,12 +567,12 @@ func _add_item_dropdown(grid: GridContainer, label_text: String, current_val: It
 	)
 	grid.add_child(ob)
 
-func _build_buff_module_ui(parent_box: VBoxContainer, bm: BuffModule) -> void:
+func _build_condition_module_ui(parent_box: VBoxContainer, bm: ConditionModule) -> void:
 	var list_container = VBoxContainer.new()
 	parent_box.add_child(list_container)
 	
-	var draw_buffs = Callable()
-	draw_buffs = func():
+	var draw_conditions = Callable()
+	draw_conditions = func():
 		for child in list_container.get_children():
 			child.queue_free()
 			
@@ -585,19 +585,16 @@ func _build_buff_module_ui(parent_box: VBoxContainer, bm: BuffModule) -> void:
 			row.theme_override_constants_separation = 5
 			list_container.add_child(row)
 			
-			# Stat target dropdown
-			var stat_ob = OptionButton.new()
-			stat_ob.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			var keys = BuffEffect.StatType.keys()
-			for k in range(keys.size()):
-				stat_ob.add_item(keys[k], k)
-				if k == effect.stat_target:
-					stat_ob.select(k)
-			stat_ob.item_selected.connect(func(selected_stat):
-				effect.stat_target = selected_stat as BuffEffect.StatType
+			# Stat target line edit
+			var stat_le = LineEdit.new()
+			stat_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			stat_le.text = String(effect.stat_target)
+			stat_le.placeholder_text = "e.g. max_health, attack"
+			stat_le.text_changed.connect(func(new_text):
+				effect.stat_target = StringName(new_text)
 				_save_current_item()
 			)
-			row.add_child(stat_ob)
+			row.add_child(stat_le)
 			
 			# Amount spinbox
 			var amount_sb = SpinBox.new()
@@ -632,24 +629,24 @@ func _build_buff_module_ui(parent_box: VBoxContainer, bm: BuffModule) -> void:
 			remove_row_btn.pressed.connect(func():
 				bm.effects.remove_at(cached_idx)
 				_save_current_item()
-				draw_buffs.call()
+				draw_conditions.call()
 			)
 			row.add_child(remove_row_btn)
 			
-	draw_buffs.call()
+	draw_conditions.call()
 	
-	var add_buff_row_btn = Button.new()
-	add_buff_row_btn.text = "+ Add Buff Effect"
-	add_buff_row_btn.pressed.connect(func():
-		var new_effect = BuffEffect.new()
-		new_effect.stat_target = BuffEffect.StatType.MAX_HEALTH
+	var add_condition_row_btn = Button.new()
+	add_condition_row_btn.text = "+ Add Condition Effect"
+	add_condition_row_btn.pressed.connect(func():
+		var new_effect = ConditionEffect.new()
+		new_effect.stat_target = &"max_health"
 		new_effect.amount = 10.0
 		new_effect.duration_seconds = 10.0
 		bm.effects.append(new_effect)
 		_save_current_item()
-		draw_buffs.call()
+		draw_conditions.call()
 	)
-	parent_box.add_child(add_buff_row_btn)
+	parent_box.add_child(add_condition_row_btn)
 
 func _get_module_name(module: ItemModule) -> String:
 	var script = module.get_script()

@@ -21,6 +21,7 @@ func rebuild(item_folder: String) -> void:
 			var file_path = item_folder.path_join(file_name)
 			var item = ResourceLoader.load(file_path, "", ResourceLoader.CACHE_MODE_IGNORE) as ItemData
 			if item:
+				item.validate_modules()
 				if item.item_id != &"":
 					items[item.item_id] = item
 				else:

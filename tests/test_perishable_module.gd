@@ -51,10 +51,10 @@ func test_is_spoiled_reads_runtime_data_correctly() -> void:
 
 	var slot = InventorySlot.new()
 	slot.runtime_data["freshness"] = 0.0
-	assert_true(p.is_spoiled(slot), "freshness = 0 ต้องถือว่าเน่าแล้ว")
+	assert_true(p.is_spoiled(slot.runtime_data), "freshness = 0 ต้องถือว่าเน่าแล้ว")
 
 	slot.runtime_data["freshness"] = 50.0
-	assert_false(p.is_spoiled(slot), "freshness = 50 ยังไม่ควรเน่า")
+	assert_false(p.is_spoiled(slot.runtime_data), "freshness = 50 ยังไม่ควรเน่า")
 
 
 func test_get_freshness_ratio_returns_normalized_value() -> void:
@@ -64,4 +64,4 @@ func test_get_freshness_ratio_returns_normalized_value() -> void:
 	var slot = InventorySlot.new()
 	slot.runtime_data["freshness"] = 100.0
 
-	assert_eq(p.get_freshness_ratio(slot), 0.5, "freshness 100/200 ต้องได้อัตราส่วน 0.5")
+	assert_eq(p.get_freshness_ratio(slot.runtime_data), 0.5, "freshness 100/200 ต้องได้อัตราส่วน 0.5")

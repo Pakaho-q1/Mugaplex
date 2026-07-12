@@ -32,3 +32,21 @@ func get_module(module_class: Script) -> ItemModule:
 # เรียกหลังแก้ค่าผ่านโค้ด (เช่น item.stackable = true; item.notify_changed())
 func notify_changed() -> void:
 	data_changed.emit()
+
+# ระบบตรวจจับความขัดแย้งของโมดูล (Module Resolution Validation)
+func validate_modules() -> void:
+	var seen_classes = {}
+	for module in modules:
+		if module == null:
+			continue
+		
+		# ดึงชื่อคลาสของสคริปต์
+		var script = module.get_script()
+		if not script:
+			continue
+			
+		var class_path = script.resource_path
+		if seen_classes.has(class_path):
+			push_warning("Item '%s' (ID: %s) มีโมดูลชนิดเดียวกัน (%s) ซ้อนทับกันอยู่! โปรดระวังพฤติกรรม Overwrite ตามนโยบาย Sequential Override" % [display_name, item_id, class_path.get_file()])
+		else:
+			seen_classes[class_path] = true

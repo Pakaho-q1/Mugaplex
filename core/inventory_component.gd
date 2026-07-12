@@ -3,7 +3,7 @@ class_name InventoryComponent
 
 # ตะโกนบอก UI เมื่อของในกระเป๋ามีการเปลี่ยนแปลง
 signal inventory_changed
-signal item_used(item: ItemData, slot_index: int, user: Node)
+signal item_used(item: ItemData, index: int, payload: Dictionary)
 signal item_dropped(item: ItemData, amount: int, runtime_data: Dictionary, slot_index: int, dropper: Node)
 
 # กำหนดขนาดกระเป๋า
@@ -354,8 +354,8 @@ func remove_item(item_data: ItemData, amount: int = 1) -> int:
 	return amount - to_remove
 
 # ใช้ไอเทมที่ช่อง index
-func use_item(index: int, user: Node = null) -> Dictionary:
-	var result = {"success": false, "message": "", "item": null}
+func use_item(index: int, user_context: Dictionary = {}) -> Dictionary:
+	var result = {"success": false, "message": "", "item": null, "payload": {}}
 	
 	if index < 0 or index >= slots.size():
 		result.message = "Index out of bounds"
@@ -367,11 +367,12 @@ func use_item(index: int, user: Node = null) -> Dictionary:
 		return result
 	
 	var item = slot.item
+	var payloads: Array = []
 	
 	# Check before_use modules
 	for module in item.modules:
 		if module.has_method("before_use"):
-			var before_res = module.before_use(slot, user)
+			var before_res = module.before_use(slot.runtime_data, user_context)
 			if before_res.get("prevented", false):
 				result.message = before_res.get("message", "Cannot use item")
 				if before_res.get("destroyed", false):
@@ -390,8 +391,11 @@ func use_item(index: int, user: Node = null) -> Dictionary:
 	var consumed = false
 	for module in item.modules:
 		if module.has_method("on_use"):
-			if module.on_use(slot, user):
+			var use_res = module.on_use(slot.runtime_data, user_context)
+			if use_res.get("consumed", false):
 				consumed = true
+			if use_res.get("payload", null):
+				payloads.append(use_res["payload"])
 				
 	if consumed:
 		slot.amount -= 1
@@ -399,20 +403,22 @@ func use_item(index: int, user: Node = null) -> Dictionary:
 			_set_occupied(index, slot.item, true)
 			slot.item = null
 		
-	item_used.emit(item, index, user)
+	var final_payload = {"actions": payloads}
+	item_used.emit(item, index, final_payload)
 	
 	result.success = true
 	result.message = "Used %s" % item.display_name
 	result.item = item
+	result.payload = final_payload
 	
 	inventory_changed.emit()
 	return result
 
-func use_item_by_data(item_data: ItemData, user: Node = null) -> Dictionary:
+func use_item_by_data(item_data: ItemData, user_context: Dictionary = {}) -> Dictionary:
 	var indices = get_item_indices(item_data)
 	if indices.is_empty():
 		return {"success": false, "message": "Item not found", "item": null}
-	return use_item(indices[0], user)
+	return use_item(indices[0], user_context)
 
 func update_modules(delta: float):
 	var changed = false
@@ -421,18 +427,22 @@ func update_modules(delta: float):
 		if slot.item:
 			for module in slot.item.modules:
 				if module.has_method("on_update"):
-					var res = module.on_update(delta, slot)
-					if res.get("changed", false):
+					var res = module.on_update(delta, slot.runtime_data)
+					if res.has("runtime_data_update") and not res["runtime_data_update"].is_empty():
 						changed = true
-						if res.get("destroyed", false):
-							_set_occupied(i, slot.item, true)
-							slot.item = null
-							slot.amount = 0
-						elif res.get("new_item", null) != null:
-							_set_occupied(i, slot.item, true)
-							slot.item = res["new_item"]
-							slot.init_runtime(slot.item)
-							_set_occupied(i, slot.item, false)
+						for key in res["runtime_data_update"]:
+							slot.runtime_data[key] = res["runtime_data_update"][key]
+					if res.get("destroyed", false):
+						changed = true
+						_set_occupied(i, slot.item, true)
+						slot.item = null
+						slot.amount = 0
+					elif res.get("new_item", null) != null:
+						changed = true
+						_set_occupied(i, slot.item, true)
+						slot.item = res["new_item"]
+						slot.init_runtime(slot.item)
+						_set_occupied(i, slot.item, false)
 	if changed:
 		inventory_changed.emit()
 

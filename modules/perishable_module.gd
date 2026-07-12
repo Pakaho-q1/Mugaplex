@@ -7,8 +7,8 @@ class_name PerishableModule
 @export var destroy_on_spoil: bool = false # true = หายไปเลยตอนเสีย
 
 # เช็คว่าเน่าแล้วหรือยัง
-func is_spoiled(slot: InventorySlot) -> bool:
-	var freshness = slot.runtime_data.get("freshness", freshness_duration)
+func is_spoiled(runtime_data: Dictionary) -> bool:
+	var freshness = runtime_data.get("freshness", freshness_duration)
 	return freshness <= 0.0
 
 # คำนวณความสดใหม่ (Pure Calculation) — ไม่แก้ไข slot เอง แค่รับค่าปัจจุบันแล้วคืนค่าใหม่
@@ -25,8 +25,8 @@ func calculate_decay(current_freshness: float, delta: float) -> Dictionary:
 	return {"freshness": freshness, "spoiled": freshness <= 0.0}
 
 # ให้ % ความสด (0.0 - 1.0)
-func get_freshness_ratio(slot: InventorySlot) -> float:
-	var freshness = slot.runtime_data.get("freshness", freshness_duration)
+func get_freshness_ratio(runtime_data: Dictionary) -> float:
+	var freshness = runtime_data.get("freshness", freshness_duration)
 	return clamp(freshness / freshness_duration, 0.0, 1.0)
 
 func get_default_runtime_data() -> Dictionary:
@@ -39,9 +39,9 @@ func get_runtime_tooltip(runtime_data: Dictionary) -> Array[String]:
 		lines.append("• Freshness: %.1f%%" % pct)
 	return lines
 
-func before_use(slot: InventorySlot, user: Node) -> Dictionary:
+func before_use(runtime_data: Dictionary, user_context: Dictionary) -> Dictionary:
 	var result = {"prevented": false}
-	if is_spoiled(slot):
+	if is_spoiled(runtime_data):
 		result.prevented = true
 		result.message = "Item is spoiled!"
 		if spoiled_item:
@@ -50,14 +50,13 @@ func before_use(slot: InventorySlot, user: Node) -> Dictionary:
 			result.destroyed = true
 	return result
 
-func on_update(delta: float, slot: InventorySlot) -> Dictionary:
-	var result = {"changed": false, "new_item": null, "destroyed": false}
-	var current_freshness = slot.runtime_data.get("freshness", freshness_duration)
+func on_update(delta: float, runtime_data: Dictionary) -> Dictionary:
+	var result = {"runtime_data_update": {}, "new_item": null, "destroyed": false}
+	var current_freshness = runtime_data.get("freshness", freshness_duration)
 	var calc = calculate_decay(current_freshness, delta)
 	
 	if calc["freshness"] != current_freshness:
-		slot.runtime_data["freshness"] = calc["freshness"]
-		result.changed = true
+		result.runtime_data_update["freshness"] = calc["freshness"]
 		
 	if calc["spoiled"]:
 		if spoiled_item:
