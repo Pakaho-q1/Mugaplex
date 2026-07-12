@@ -1,6 +1,7 @@
 extends Panel
 
 const SLOT_UI_SCENE = preload("res://addons/universal_inventory/ui/slot_ui.tscn")
+const InventoryAPI = preload("res://addons/universal_inventory/api/inventory_api.gd")
 
 @export var inventory_component: InventoryComponent
 @export var user: Node
@@ -39,10 +40,23 @@ func update_ui():
 
 # --- ส่งผ่านการร้องขอ (Pass-through Requests) ไปยัง Core ---
 
+signal tooltip_requested(slot_index: int, item_data: ItemData, runtime_data: Dictionary)
+signal tooltip_canceled(slot_index: int)
+
 func request_use(index: int) -> void:
 	if inventory_component:
-		inventory_component.use_item(index, user)
+		InventoryAPI.use_item(inventory_component, index, user)
 
 func request_move(source_index: int, target_index: int) -> void:
 	if inventory_component:
-		inventory_component.move_item(source_index, target_index)
+		InventoryAPI.move_item(inventory_component, source_index, target_index)
+
+func request_show_tooltip(index: int) -> void:
+	if inventory_component and index >= 0 and index < inventory_component.slots.size():
+		var slot_data = inventory_component.slots[index]
+		var owning_slot = slot_data.get_owning_slot()
+		if owning_slot.item:
+			tooltip_requested.emit(index, owning_slot.item, owning_slot.runtime_data)
+
+func request_hide_tooltip(index: int) -> void:
+	tooltip_canceled.emit(index)

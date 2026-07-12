@@ -21,12 +21,8 @@ func update_slot(slot_data: InventorySlot, index: int, comp: InventoryComponent,
 	var owning_slot = slot_data.get_owning_slot()
 	if owning_slot.item == null or slot_data.is_occupied_cell():
 		_clear_display()
-		if slot_data.is_occupied_cell():
-			# แสดงผลเป็นช่องที่โดนจอง (อาจจะวาดทับด้วยสีอื่น/ว่างเปล่า)
-			tooltip_text = "Reserved cell"
 	else:
 		icon.texture = owning_slot.item.icon
-		tooltip_text = owning_slot.item.display_name # เปิดการใช้งาน Tooltip ของ Godot
 		if owning_slot.amount > 1:
 			amount_label.text = str(owning_slot.amount)
 		else:
@@ -35,7 +31,18 @@ func update_slot(slot_data: InventorySlot, index: int, comp: InventoryComponent,
 func _clear_display():
 	icon.texture = null
 	amount_label.text = ""
-	tooltip_text = ""
+
+func _ready():
+	mouse_entered.connect(_on_mouse_entered)
+	mouse_exited.connect(_on_mouse_exited)
+
+func _on_mouse_entered():
+	if slot_index != -1 and inventory_ui and inventory_ui.has_method("request_show_tooltip"):
+		inventory_ui.request_show_tooltip(slot_index)
+
+func _on_mouse_exited():
+	if slot_index != -1 and inventory_ui and inventory_ui.has_method("request_hide_tooltip"):
+		inventory_ui.request_hide_tooltip(slot_index)
 
 # --- การคลิกเพื่อขอใช้งานไอเทม (ส่งต่อคำขอ) ---
 func _gui_input(event: InputEvent) -> void:
@@ -97,110 +104,3 @@ func _drop_data(_at_position: Vector2, data: Variant) -> void:
 	if inventory_ui and inventory_ui.has_method("request_move"):
 		inventory_ui.request_move(source_idx, slot_index)
 
-# --- ระบบสร้าง Tooltip ตามโมดูลของไอเทม (Pure UI Representation) ---
-func _make_custom_tooltip(_for_text: String) -> Control:
-	if slot_index == -1 or not inventory_component:
-		return null
-		
-	var slot_data = inventory_component.slots[slot_index]
-	var owning_slot = slot_data.get_owning_slot()
-	if not owning_slot or not owning_slot.item:
-		return null
-		
-	var item = owning_slot.item
-	
-	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(220, 0)
-	
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.08, 0.08, 0.1, 0.95)
-	style.border_width_left = 1
-	style.border_width_right = 1
-	style.border_width_top = 1
-	style.border_width_bottom = 1
-	style.border_color = Color(0.25, 0.25, 0.35)
-	style.set_content_margin_all(8)
-	panel.add_theme_stylebox_override("panel", style)
-	
-	var vbox = VBoxContainer.new()
-	vbox.theme_override_constants_separation = 4
-	panel.add_child(vbox)
-	
-	# ชื่อไอเทม
-	var title = Label.new()
-	title.text = item.display_name
-	title.theme_type_variation = &"HeaderSmall"
-	title.add_theme_color_override("font_color", Color(1.0, 0.9, 0.6))
-	vbox.add_child(title)
-	
-	# คำอธิบาย
-	if item.description != "":
-		var desc = Label.new()
-		desc.text = item.description
-		desc.add_theme_font_size_override("font_size", 11)
-		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		desc.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
-		vbox.add_child(desc)
-		
-	vbox.add_child(HSeparator.new())
-	
-	# รายละเอียดโมดูล (สืบค้นผ่าน Reflection)
-	var has_modules_info = false
-	for module in item.modules:
-		if not module:
-			continue
-			
-		var mod_script = module.get_script()
-		var mod_name = mod_script.resource_path.get_file().get_basename().capitalize()
-		
-		var props_text = []
-		for prop in module.get_property_list():
-			if prop.name in ["resource_path", "resource_name", "resource_local_to_scene", "script", "resource_scene_unique_id"]:
-				continue
-			if prop.name.begins_with("_"):
-				continue
-				
-			var val = module.get(prop.name)
-			if val != null and str(val) != "<null>":
-				var prop_label = prop.name.capitalize().replace("_", " ")
-				if val is Resource and "display_name" in val:
-					props_text.append("• %s: %s" % [prop_label, val.display_name])
-				else:
-					props_text.append("• %s: %s" % [prop_label, str(val)])
-				
-		if not props_text.is_empty():
-			has_modules_info = true
-			var mod_label = Label.new()
-			mod_label.text = mod_name
-			mod_label.add_theme_font_size_override("font_size", 11)
-			mod_label.add_theme_color_override("font_color", Color(0.4, 0.7, 1.0))
-			vbox.add_child(mod_label)
-			
-			var prop_label = Label.new()
-			prop_label.text = "\n".join(props_text)
-			prop_label.add_theme_font_size_override("font_size", 10)
-			prop_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
-			vbox.add_child(prop_label)
-			
-	# ข้อมูลความทนทาน/ความเน่าเสียชั่วขณะ
-	var runtime_lines = []
-	for module in item.modules:
-		if module.has_method("get_runtime_tooltip"):
-			runtime_lines.append_array(module.get_runtime_tooltip(owning_slot.runtime_data))
-			
-	if not runtime_lines.is_empty():
-		if has_modules_info:
-			vbox.add_child(HSeparator.new())
-		var rt_title = Label.new()
-		rt_title.text = "Runtime Data"
-		rt_title.add_theme_font_size_override("font_size", 11)
-		rt_title.add_theme_color_override("font_color", Color(0.4, 0.9, 0.4))
-		vbox.add_child(rt_title)
-		
-		var rt_label = Label.new()
-		rt_label.text = "\n".join(runtime_lines)
-		rt_label.add_theme_font_size_override("font_size", 10)
-		rt_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
-		vbox.add_child(rt_label)
-		
-	return panel
