@@ -1,0 +1,260 @@
+[gd_scene format=3 uid="uid://bx24ufc12gtj7"]
+
+[ext_resource type="Script" uid="uid://cca7u2j22diqf" path="res://addons/universal_inventory/ui/item_database.gd" id="1_ffwfi"]
+
+[node name="item_database" type="Control" unique_id=853516103]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("1_ffwfi")
+
+[node name="HSplitContainer" type="HSplitContainer" parent="." unique_id=1144227892]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+split_offset = 260
+
+[node name="LeftPanel" type="VBoxContainer" parent="HSplitContainer" unique_id=372234200]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 2
+
+[node name="SearchBox" type="HBoxContainer" parent="HSplitContainer/LeftPanel"]
+layout_mode = 2
+
+[node name="SearchInput" type="LineEdit" parent="HSplitContainer/LeftPanel/SearchBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "🔎 Search by name/ID..."
+
+[node name="ItemList" type="ItemList" parent="HSplitContainer/LeftPanel" unique_id=1411428898]
+layout_mode = 2
+size_flags_vertical = 3
+fixed_icon_size = Vector2i(24, 24)
+
+[node name="ButtonBox" type="HBoxContainer" parent="HSplitContainer/LeftPanel"]
+layout_mode = 2
+
+[node name="AddItemButton" type="Button" parent="HSplitContainer/LeftPanel/ButtonBox" unique_id=1170177924]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "+ New Item"
+
+[node name="DeleteItemButton" type="Button" parent="HSplitContainer/LeftPanel/ButtonBox" unique_id=1170177925]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "- Delete"
+
+[node name="RightPanel" type="ScrollContainer" parent="HSplitContainer" unique_id=1013173344]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RightContent" type="VBoxContainer" parent="HSplitContainer/RightPanel" unique_id=952226977]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="Placeholder" type="CenterContainer" parent="HSplitContainer/RightPanel/RightContent"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="PlaceholderLabel" type="Label" parent="HSplitContainer/RightPanel/RightContent/Placeholder"]
+layout_mode = 2
+text = "Select an item from the list or click '+ New Item' to begin."
+horizontal_alignment = 1
+
+[node name="EditorForm" type="VBoxContainer" parent="HSplitContainer/RightPanel/RightContent"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 15
+
+[node name="GeneralPanel" type="PanelContainer" parent="HSplitContainer/RightPanel/RightContent/EditorForm"]
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="HSplitContainer/RightPanel/RightContent/EditorForm/GeneralPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="HSplitContainer/RightPanel/RightContent/EditorForm/GeneralPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="HSplitContainer/RightPanel/RightContent/EditorForm/GeneralPanel/Margin/VBox"]
+layout_mode = 2
+theme_type_variation = &"HeaderMedium"
+text = "General Settings"
+
+[node name="HSeparator" type="HSeparator" parent="HSplitContainer/RightPanel/RightContent/EditorForm/GeneralPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="Grid" type="GridContainer" parent="HSplitContainer/RightPanel/RightContent/EditorForm/GeneralPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 10
+columns = 2
+
+[node name="IDLabel" type="Label" parent="HSplitContainer/RightPanel/RightContent/EditorForm/GeneralPanel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "Item ID:"
+
+[node name="ItemIDInput" type="LineEdit" parent="HSplitContainer/RightPanel/RightContent/EditorForm/GeneralPanel/Margin/VBox/Grid"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "unique_item_id"
+
+[node name="NameLabel" type="Label" parent="HSplitContainer/RightPanel/RightContent/EditorForm/GeneralPanel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "Display Name:"
+
+[node name="ItemNameInput" type="LineEdit" parent="HSplitContainer/RightPanel/RightContent/EditorForm/GeneralPanel/Margin/VBox/Grid"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Item Name"
+
+[node name="DescLabel" type="Label" parent="HSplitContainer/RightPanel/RightContent/EditorForm/GeneralPanel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "Description:"
+
+[node name="ItemDescInput" type="TextEdit" parent="HSplitContainer/RightPanel/RightContent/EditorForm/GeneralPanel/Margin/VBox/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Write item description here..."
+
+[node name="IconLabel" type="Label" parent="HSplitContainer/RightPanel/RightContent/EditorForm/GeneralPanel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "Item Icon:"
+
+[node name="IconBox" type="HBoxContainer" parent="HSplitContainer/RightPanel/RightContent/EditorForm/GeneralPanel/Margin/VBox/Grid"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="IconPreview" type="TextureRect" parent="HSplitContainer/RightPanel/RightContent/EditorForm/GeneralPanel/Margin/VBox/Grid/IconBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(48, 48)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="VBox" type="VBoxContainer" parent="HSplitContainer/RightPanel/RightContent/EditorForm/GeneralPanel/Margin/VBox/Grid/IconBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+
+[node name="IconPathLabel" type="Label" parent="HSplitContainer/RightPanel/RightContent/EditorForm/GeneralPanel/Margin/VBox/Grid/IconBox/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "(No Icon Assigned)"
+clip_text = true
+
+[node name="SelectIconBtn" type="Button" parent="HSplitContainer/RightPanel/RightContent/EditorForm/GeneralPanel/Margin/VBox/Grid/IconBox/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Choose Icon..."
+
+[node name="InventoryPanel" type="PanelContainer" parent="HSplitContainer/RightPanel/RightContent/EditorForm"]
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="HSplitContainer/RightPanel/RightContent/EditorForm/InventoryPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="HSplitContainer/RightPanel/RightContent/EditorForm/InventoryPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="HSplitContainer/RightPanel/RightContent/EditorForm/InventoryPanel/Margin/VBox"]
+layout_mode = 2
+theme_type_variation = &"HeaderMedium"
+text = "Inventory Settings"
+
+[node name="HSeparator" type="HSeparator" parent="HSplitContainer/RightPanel/RightContent/EditorForm/InventoryPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="Grid" type="GridContainer" parent="HSplitContainer/RightPanel/RightContent/EditorForm/InventoryPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 10
+columns = 2
+
+[node name="StackableLabel" type="Label" parent="HSplitContainer/RightPanel/RightContent/EditorForm/InventoryPanel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "Stackable:"
+
+[node name="StackableCheck" type="CheckBox" parent="HSplitContainer/RightPanel/RightContent/EditorForm/InventoryPanel/Margin/VBox/Grid"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="MaxStackLabel" type="Label" parent="HSplitContainer/RightPanel/RightContent/EditorForm/InventoryPanel/Margin/VBox/Grid"]
+layout_mode = 2
+text = "Max Stack Size:"
+
+[node name="MaxStackInput" type="SpinBox" parent="HSplitContainer/RightPanel/RightContent/EditorForm/InventoryPanel/Margin/VBox/Grid"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 1.0
+max_value = 9999.0
+value = 99.0
+
+[node name="ModulesPanel" type="PanelContainer" parent="HSplitContainer/RightPanel/RightContent/EditorForm"]
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="HSplitContainer/RightPanel/RightContent/EditorForm/ModulesPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="HSplitContainer/RightPanel/RightContent/EditorForm/ModulesPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="HSplitContainer/RightPanel/RightContent/EditorForm/ModulesPanel/Margin/VBox"]
+layout_mode = 2
+theme_type_variation = &"HeaderMedium"
+text = "Modules"
+
+[node name="HSeparator" type="HSeparator" parent="HSplitContainer/RightPanel/RightContent/EditorForm/ModulesPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="ModuleList" type="VBoxContainer" parent="HSplitContainer/RightPanel/RightContent/EditorForm/ModulesPanel/Margin/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="AddModuleBox" type="HBoxContainer" parent="HSplitContainer/RightPanel/RightContent/EditorForm/ModulesPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ModuleSelect" type="OptionButton" parent="HSplitContainer/RightPanel/RightContent/EditorForm/ModulesPanel/Margin/VBox/AddModuleBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="AddModuleButton" type="Button" parent="HSplitContainer/RightPanel/RightContent/EditorForm/ModulesPanel/Margin/VBox/AddModuleBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "+ Add Module"
