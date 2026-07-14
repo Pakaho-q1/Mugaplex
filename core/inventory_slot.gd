@@ -3,19 +3,20 @@ extends Resource
 class_name InventorySlot
 
 # ช่องนี้เก็บไอเทมอะไร? (ถ้าเป็น null คือช่องว่าง)
+## The ItemData resource currently occupying this slot.
 @export var item: ItemData
 # มีไอเทมกี่ชิ้น?
+## The number of items in this slot.
 @export var amount: int = 0
-
 # โมดูลไอเทมที่ช่องนี้ยินยอมให้ใส่ (หากว่างไว้ จะใส่ไอเทมประเภทใดก็ได้)
+## If defined, this slot will only accept items that contain AT LEAST ONE of these modules. Leave empty to accept any module.
 @export var accepted_modules: Array[Script] = []
-
 # หมวดหมู่ไอเทมที่รับได้ (เช่น ["equip_0"] สำหรับหมวก) ถ้าปล่อยว่างจะรับได้ทุกหมวด
+## If defined, this slot will only accept items whose ID contains these categories (e.g. 'equip_', 'weapon_'). Leave empty to accept any category.
 @export var accepted_categories: Array[StringName] = []
-
 # ใช้แทนที่ max_stack ของไอเทม (ถ้ามากกว่า 0) เช่น บังคับให้ช่องอุปกรณ์มีได้แค่ 1 ชิ้น
+## Overrides the item's max stack limit for this specific slot (e.g. set to 1 for equipment slots). Set to 0 to use the item's default limit.
 @export var max_amount_override: int = 0
-
 # คืนค่าจำนวนสูงสุดที่ช่องนี้จะเก็บไอเทมชนิดนั้นๆ ได้
 func get_max_stack(item_data: ItemData) -> int:
 	if item_data == null: return 0
@@ -24,7 +25,7 @@ func get_max_stack(item_data: ItemData) -> int:
 	return item_data.max_stack
 
 # ตัวแปรระบุว่าช่องนี้ถูกช่องหลักอื่นจองไว้ (สล๊อตไอเทมขนาดใหญ่)
-@export var occupied_by: InventorySlot = null
+var occupied_by: InventorySlot = null
 
 # ค่าสถานะที่ "เปลี่ยนแปลงได้เฉพาะชิ้นนี้" (เช่น durability ปัจจุบัน, ความสด)
 var runtime_data: Dictionary = {}
@@ -85,3 +86,5 @@ func can_accept(item_data: ItemData) -> bool:
 			return false
 			
 	return true
+
+

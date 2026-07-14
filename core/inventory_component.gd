@@ -7,12 +7,14 @@ signal item_used(item: ItemData, index: int, payload: Dictionary)
 signal item_dropped(item: ItemData, amount: int, runtime_data: Dictionary, slot_index: int, dropper: Node)
 
 # กำหนดขนาดกระเป๋า
+## The maximum number of slots this inventory can hold.
 @export var max_slots: int = 20
+@export_group("Grid / Multi-Cell Settings")
+## (Optional) The number of columns in the grid. Only used if you are building a Multi-cell (Diablo-style) inventory.
 @export var grid_columns: int = 1
-
 # Array ที่เก็บ "ช่องกระเป๋า" ทั้งหมด
+## Array of pre-configured slots. Use this to assign starting items or to define specific Filters (e.g. Equipment slots).
 @export var slots: Array[InventorySlot] = []
-
 func _ready():
 	# ให้จำนวนช่องตรงกับ max_slots เสมอ
 	while slots.size() < max_slots:
@@ -133,7 +135,7 @@ func add_item(item_data: ItemData, amount: int = 1) -> int:
 		inventory_changed.emit()
 	return amount_to_add
 	
-func move_item(source_index: int, target_index: int):
+func move_item(source_index: int, target_index: int, move_amount: int = -1):
 	if source_index == target_index:
 		return
 	if source_index < 0 or source_index >= slots.size() or target_index < 0 or target_index >= slots.size():
@@ -143,7 +145,6 @@ func move_item(source_index: int, target_index: int):
 	var source = slots[source_index]
 	var target = slots[target_index]
 	
-	# ถ้าคลิกที่ช่องลูก (occupied_by) ให้ถือว่ากำลังอ้างอิงถึงช่องแม่
 	if source.occupied_by != null:
 		source_index = slots.find(source.occupied_by)
 		source = slots[source_index]
@@ -156,29 +157,55 @@ func move_item(source_index: int, target_index: int):
 
 	if source.item == null:
 		return
+		
+	var actual_move_amount = source.amount if move_amount == -1 else clampi(move_amount, 1, source.amount)
 
 	# กรณีที่ 1: ถ้าไอเทม 2 ช่องเป็นของชิ้นเดียวกัน และอนุญาตให้ทับซ้อนได้ (Stackable)
 	if target.item != null and source.item == target.item and source.item.stackable:
-		# ต้องเช็ค can_accept ใน target ด้วยเพื่อความชัวร์ (แม้ปกติรวมกองน่าจะได้)
 		if not target.can_accept(source.item): return
 		var space_left = target.get_max_stack(target.item) - target.amount
 		
 		if space_left > 0:
-			var transfer_amount = min(source.amount, space_left)
+			var transfer_amount = min(actual_move_amount, space_left)
 			target.amount += transfer_amount
 			source.amount -= transfer_amount
 			
 			if source.amount == 0:
-				_set_occupied(source_index, source.item, true)
+				_set_occupied(source_index, source.item, true) # Clear old occupancy
 				source.item = null
 				source.runtime_data.clear()
 			inventory_changed.emit()
 		return
-
-	# กรณีที่ 2: สลับที่ (Swap) หรือย้ายไปช่องว่างเปล่า (Move to empty)
-	# เนื่องจากขนาดไอเทมอาจไม่เท่ากัน (Multi-cell) เราต้อง:
-	# - ลบการจองพื้นที่ของทั้งคู่ชั่วคราว
-	# - เช็คว่าทั้งคู่วางลงในตำแหน่งใหม่ได้ไหม
+		
+	# Partial move (Split) to a slot that already has a different item is not allowed (No partial swap)
+	if target.item != null and actual_move_amount < source.amount:
+		return
+		
+	# กรณีที่ 2: ย้ายไปช่องว่าง (Partial or Full)
+	if target.item == null:
+		if not target.can_accept(source.item): return
+		
+		var ignore_source: Array[int] = []
+		var grid_w = grid_columns
+		var w = source.item.grid_size.x
+		var h = source.item.grid_size.y
+		for y in range(h):
+			for x in range(w):
+				ignore_source.append(source_index + y * grid_w + x)
+				
+		if not can_place_item_at(source.item, target_index, ignore_source): return
+		
+		if actual_move_amount < source.amount:
+			# Split to empty slot
+			target.item = source.item
+			target.amount = actual_move_amount
+			target.runtime_data = source.runtime_data.duplicate(true)
+			source.amount -= actual_move_amount
+			_set_occupied(target_index, target.item, false)
+			inventory_changed.emit()
+			return
+			
+	# กรณีที่ 3: สลับที่ (Full Swap) หรือย้ายเต็มจำนวนไปช่องว่าง
 	
 	# จำค่าเดิม
 	var s_item = source.item
@@ -367,6 +394,10 @@ func use_item(index: int, user_context: Dictionary = {}) -> Dictionary:
 		return result
 	
 	var item = slot.item
+	if item.get("disable_use") == true:
+		result.message = "Item cannot be used"
+		return result
+		
 	var payloads: Array = []
 	
 	# Check before_use modules
@@ -498,3 +529,68 @@ func deserialize(data: Array) -> void:
 			_set_occupied(i, slots[i].item, false)
 			
 	inventory_changed.emit()
+
+func take_item_amount(index: int, amount: int = -1) -> Dictionary:
+	if index < 0 or index >= slots.size(): return {}
+	var slot = slots[index]
+	if slot.occupied_by != null:
+		index = slots.find(slot.occupied_by)
+		slot = slots[index]
+	if slot.item == null: return {}
+	
+	var take_amt = slot.amount if amount == -1 else clampi(amount, 1, slot.amount)
+	var payload = {
+		"item": slot.item,
+		"amount": take_amt,
+		"runtime_data": slot.runtime_data.duplicate(true)
+	}
+	
+	slot.amount -= take_amt
+	if slot.amount <= 0:
+		_set_occupied(index, slot.item, true)
+		slot.item = null
+		slot.runtime_data.clear()
+	
+	inventory_changed.emit()
+	return payload
+
+func place_item_amount(index: int, item: ItemData, amount: int, runtime: Dictionary) -> int:
+	if index < 0 or index >= slots.size() or item == null or amount <= 0: return amount
+	var slot = slots[index]
+	if slot.occupied_by != null:
+		index = slots.find(slot.occupied_by)
+		slot = slots[index]
+		
+	# Merge
+	if slot.item != null and slot.item == item and item.stackable:
+		if not slot.can_accept(item): return amount
+		var space = slot.get_max_stack(item) - slot.amount
+		var transfer = min(amount, space)
+		if transfer > 0:
+			slot.amount += transfer
+			amount -= transfer
+			inventory_changed.emit()
+		return amount
+		
+	# Empty slot
+	if slot.item == null:
+		if not slot.can_accept(item): return amount
+		var ignore_source: Array[int] = []
+		var grid_w = grid_columns
+		var w = item.grid_size.x
+		var h = item.grid_size.y
+		for y in range(h):
+			for x in range(w):
+				ignore_source.append(index + y * grid_w + x)
+		if not can_place_item_at(item, index, ignore_source): return amount
+		
+		var place_amt = min(amount, slot.get_max_stack(item))
+		slot.item = item
+		slot.amount = place_amt
+		slot.runtime_data = runtime.duplicate(true)
+		amount -= place_amt
+		_set_occupied(index, slot.item, false)
+		inventory_changed.emit()
+		return amount
+		
+	return amount

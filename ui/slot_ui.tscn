@@ -11,6 +11,9 @@ custom_minimum_size = Vector2(64, 64)
 offset_right = 64.0
 offset_bottom = 64.0
 script = ExtResource("1_cp18p")
+slot_index = -1
+icon_rect_path = NodePath("Icon")
+amount_label_path = NodePath("AmountLabel")
 
 [node name="Icon" type="TextureRect" parent="." unique_id=1505469370]
 layout_mode = 2

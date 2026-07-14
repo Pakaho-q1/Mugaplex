@@ -8,6 +8,7 @@ offset_left = 1.0
 offset_right = 233.0
 offset_bottom = 178.0
 script = ExtResource("1_qpmqw")
+auto_spawn_container = NodePath("GridContainer")
 
 [node name="GridContainer" type="GridContainer" parent="." unique_id=1420166978]
 custom_minimum_size = Vector2(32, 32)

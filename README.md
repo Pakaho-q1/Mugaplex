@@ -77,6 +77,7 @@ else:
 - 📖 [**API Reference (คู่มืออ้างอิง API)**](docs/api_reference.md) - อธิบายการเรียกใช้งานฟังก์ชัน พร้อม Use Case
 - 🛠️ [**Creating Items (คู่มือการสร้างไอเทม)**](docs/creating_items.md) - สอนวิธีใช้ Data-Driven และการเขียน Custom Module
 - 🎨 [**UI Guide (คู่มือการสร้างหน้าต่าง UI)**](docs/ui_guide.md) - เจาะลึกคอนเซปต์ "Dumb UI" และการเชื่อมต่อกับระบบ
+- 🤖 [**AI Prompting Guide (คู่มือสำหรับป้อน AI)**](docs/ai_prompt_guide.md) - สำหรับโยนให้ ChatGPT/Copilot อ่านก่อนสั่งเขียนโค้ด เพื่อป้องกันการหลุดกรอบแนวคิด
 
 ---
 

@@ -1,10 +1,14 @@
 extends ItemModule
 class_name PerishableModule
 
-@export var freshness_duration: float = 600.0 # วินาที (10 นาที default)
-@export var spoil_chance_per_second: float = 0.0 # โอกาสเสียเพิ่มทีละวินาที (0 = ไม่มีโอกาส)
-@export var spoiled_item: ItemData = null # ไอเทมที่กลายเป็นตอนเสีย (เช่น ผลไม้เน่า)
-@export var destroy_on_spoil: bool = false # true = หายไปเลยตอนเสีย
+## Total time in seconds before the item spoils (default 10 mins).
+@export var freshness_duration: float = 600.0
+## Chance per second for the item to spoil instantly (0 = disabled).
+@export var spoil_chance_per_second: float = 0.0
+## The ItemData to replace this item with when it spoils (e.g. Rotten Food).
+@export var spoiled_item: ItemData = null
+## If true, the item is completely destroyed upon spoiling.
+@export var destroy_on_spoil: bool = false
 
 # เช็คว่าเน่าแล้วหรือยัง
 func is_spoiled(runtime_data: Dictionary) -> bool:
