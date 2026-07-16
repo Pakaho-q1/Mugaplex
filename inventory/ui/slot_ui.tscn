@@ -1,0 +1,29 @@
+[gd_scene format=3 uid="uid://dnqoj28jqw5tn"]
+
+[ext_resource type="Script" uid="uid://crytaf661cp2g" path="res://addons/mugaplex/inventory/ui/slot_ui.gd" id="1_cp18p"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_cp18p"]
+font_size = 12
+shadow_color = Color(0, 0, 0, 0.08627451)
+
+[node name="SlotUI" type="PanelContainer" unique_id=796443541]
+custom_minimum_size = Vector2(64, 64)
+offset_right = 64.0
+offset_bottom = 64.0
+script = ExtResource("1_cp18p")
+slot_index = -1
+icon_rect_path = NodePath("Icon")
+amount_label_path = NodePath("AmountLabel")
+
+[node name="Icon" type="TextureRect" parent="." unique_id=1505469370]
+layout_mode = 2
+stretch_mode = 5
+
+[node name="AmountLabel" type="Label" parent="." unique_id=193053874]
+layout_mode = 2
+size_flags_horizontal = 8
+size_flags_vertical = 8
+text = ""
+label_settings = SubResource("LabelSettings_cp18p")
+horizontal_alignment = 2
+vertical_alignment = 2

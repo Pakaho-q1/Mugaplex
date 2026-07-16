@@ -28,7 +28,7 @@ This slot will only accept items that contain the `PerishableModule` script.
 
 ```gdscript
 var fridge_slot = InventorySlot.new()
-fridge_slot.accepted_modules = [preload("res://addons/universal_inventory/modules/perishable_module.gd")]
+fridge_slot.accepted_modules = [preload("res://addons/mugaplex/inventory/modules/perishable_module.gd")]
 ```
 
 ### Checking if an item can be accepted
