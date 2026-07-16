@@ -24,7 +24,14 @@ signal data_changed
 ## The maximum number of items that can be stacked in a single slot. Ignored if stackable is false.
 @export_range(1, 9999) var max_stack: int = 99
 ## How many grid cells this item occupies (width, height). Used for multi-cell (Diablo-style) inventories.
-@export var grid_size: Vector2i = Vector2i(1, 1)
+@export var grid_size: Vector2i = Vector2i(1, 1):
+	set(value):
+		grid_size = value
+		emit_changed()
+## Weight of a single unit of this item. 0.0 = weightless (default, fully backward-compatible).
+@export var weight: float = 0.0
+## If false, this item can never be rotated in a grid inventory, even if the player requests it.
+@export var can_rotate: bool = true
 
 @export_group("Modules")
 ## Add modules here to define item behaviors (e.g. ConsumableModule, EquipmentModule).

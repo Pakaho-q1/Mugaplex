@@ -18,12 +18,14 @@ func is_spoiled(runtime_data: Dictionary) -> bool:
 # คำนวณความสดใหม่ (Pure Calculation) — ไม่แก้ไข slot เอง แค่รับค่าปัจจุบันแล้วคืนค่าใหม่
 # ผู้เรียก (InventoryComponent) เป็นคนนำค่าที่คืนมาไปเซ็ตใส่ slot.runtime_data เอง
 # คืนค่า: {"freshness": float ค่าใหม่, "spoiled": bool เน่าแล้วหรือยัง}
-func calculate_decay(current_freshness: float, delta: float) -> Dictionary:
+func calculate_decay(current_freshness: float, delta: float, rng: RandomNumberGenerator = null) -> Dictionary:
 	var freshness = current_freshness - delta
 
 	# โอกาสเสียเพิ่ม (ถ้าตั้งค่าไว้)
-	if spoil_chance_per_second > 0.0 and randf() < spoil_chance_per_second * delta:
-		freshness = 0.0
+	if spoil_chance_per_second > 0.0:
+		var roll = rng.randf() if rng else randf()
+		if roll < spoil_chance_per_second * delta:
+			freshness = 0.0
 
 	freshness = max(freshness, 0.0)
 	return {"freshness": freshness, "spoiled": freshness <= 0.0}
@@ -54,10 +56,10 @@ func before_use(runtime_data: Dictionary, user_context: Dictionary) -> Dictionar
 			result.destroyed = true
 	return result
 
-func on_update(delta: float, runtime_data: Dictionary) -> Dictionary:
+func on_update(delta: float, runtime_data: Dictionary, rng: RandomNumberGenerator = null) -> Dictionary:
 	var result = {"runtime_data_update": {}, "new_item": null, "destroyed": false}
 	var current_freshness = runtime_data.get("freshness", freshness_duration)
-	var calc = calculate_decay(current_freshness, delta)
+	var calc = calculate_decay(current_freshness, delta, rng)
 	
 	if calc["freshness"] != current_freshness:
 		result.runtime_data_update["freshness"] = calc["freshness"]

@@ -11,7 +11,7 @@ func get_runtime_tooltip(runtime_data: Dictionary) -> Array[String]:
 	return []
 
 # 3. ให้โมดูลทำงานทุกเฟรม (เช่น เน่าเสีย) คืนค่า {"runtime_data_update": Dictionary, "new_item": ItemData, "destroyed": bool}
-func on_update(delta: float, runtime_data: Dictionary) -> Dictionary:
+func on_update(delta: float, runtime_data: Dictionary, rng: RandomNumberGenerator = null) -> Dictionary:
 	return {}
 
 # 4. เมื่อถูกตรวจสอบก่อนการใช้งาน (กันไม่ให้ใช้ เช่น ถ้าเน่าแล้ว)

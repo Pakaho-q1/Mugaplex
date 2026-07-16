@@ -1,5 +1,45 @@
 class_name InventoryAPI
 
+## Toggles rotation state of the item at slot_index. Returns false if rotation is
+## not possible (item cannot rotate, or rotated footprint doesn't fit).
+static func rotate_item(inventory: InventoryComponent, slot_index: int) -> bool:
+	if not inventory or slot_index < 0 or slot_index >= inventory.slots.size():
+		return false
+	var slot = inventory.slots[slot_index].get_owning_slot()
+	if not slot or not slot.item:
+		return false
+	if not slot.item.can_rotate:
+		return false
+	# Only meaningful for multi-cell items
+	if slot.item.grid_size.x == slot.item.grid_size.y:
+		return true # Square items: rotation is a no-op but not an error
+	
+	var real_idx = inventory.slots.find(slot)
+	var current_rotated = slot.runtime_data.get("rotated", false)
+	var new_rotated = not current_rotated
+	
+	# Build ignore list from current footprint
+	var ignore: Array[int] = []
+	var grid_w = inventory.grid_columns
+	var old_w = slot.item.grid_size.y if current_rotated else slot.item.grid_size.x
+	var old_h = slot.item.grid_size.x if current_rotated else slot.item.grid_size.y
+	var sx = real_idx % grid_w
+	var sy = real_idx / grid_w
+	for y in range(old_h):
+		for x in range(old_w):
+			ignore.append((sy + y) * grid_w + (sx + x))
+	
+	# Check if rotated footprint fits
+	if not inventory.can_place_item_at(slot.item, real_idx, ignore, new_rotated):
+		return false
+	
+	# Apply: clear old occupancy, set new
+	inventory._set_occupied(real_idx, slot.item, true, current_rotated)
+	slot.runtime_data["rotated"] = new_rotated
+	inventory._set_occupied(real_idx, slot.item, false, new_rotated)
+	inventory.inventory_changed.emit()
+	return true
+
 ## ย้ายไอเทมจากช่องหนึ่งไปอีกช่องหนึ่ง
 static func move_item(inventory: InventoryComponent, source_idx: int, target_idx: int) -> void:
 	if not inventory:
@@ -319,24 +359,37 @@ static func consume_item(inventory: InventoryComponent, item: ItemData, amount: 
 	return true
 
 ## ย้ายไอเทมข้ามกระเป๋า (เช่น หยิบของจากหีบสมบัติ ใส่ตัวผู้เล่น)
-static func transfer_item(source_inv: InventoryComponent, target_inv: InventoryComponent, source_idx: int, target_idx: int = -1, amount: int = -1) -> bool:
+## Returns: leftover amount that could not be transferred (0 = fully transferred).
+static func transfer_item(source_inv: InventoryComponent, target_inv: InventoryComponent, source_idx: int, target_idx: int = -1, amount: int = -1) -> int:
 	if not source_inv or not target_inv or source_idx < 0 or source_idx >= source_inv.slots.size():
-		return false
+		return amount if amount > 0 else 0
 		
 	var source_slot = source_inv.slots[source_idx].get_owning_slot()
 	if not source_slot or not source_slot.item:
-		return false
+		return amount if amount > 0 else 0
 		
 	var item = source_slot.item
 	var transfer_amount = amount
 	if transfer_amount <= 0 or transfer_amount > source_slot.amount:
 		transfer_amount = source_slot.amount
+	var original_amount = transfer_amount
+	
+	# Circular containment guard
+	if source_slot.runtime_data.has("instance_id") and target_inv._would_create_cycle(source_slot.runtime_data["instance_id"]):
+		return original_amount
+	
+	# Weight constraint: clamp to what destination can hold
+	var allowed = target_inv._max_addable_by_weight(item, transfer_amount)
+	if allowed <= 0:
+		return transfer_amount
+	var rejected_by_weight = transfer_amount - allowed
+	transfer_amount = allowed
 		
-	# ถ้าย้ายแบบไม่ระบุช่องเป้าหมาย (ให้ระบบหาให้)
+	# Auto-place (no target slot specified)
 	if target_idx == -1:
-		var remaining_to_transfer = target_inv.add_item(item, transfer_amount)
-		if remaining_to_transfer < transfer_amount:
-			var actually_transferred = transfer_amount - remaining_to_transfer
+		var remaining = target_inv.add_item(item, transfer_amount)
+		var actually_transferred = transfer_amount - remaining
+		if actually_transferred > 0:
 			source_slot.amount -= actually_transferred
 			if source_slot.amount <= 0:
 				var origin_idx = source_inv.slots.find(source_slot)
@@ -345,33 +398,47 @@ static func transfer_item(source_inv: InventoryComponent, target_inv: InventoryC
 				source_slot.amount = 0
 				source_slot.runtime_data.clear()
 			source_inv.inventory_changed.emit()
-			return true
-		return false
+		return remaining + rejected_by_weight
 		
-	# ถ้าย้ายแบบระบุช่องเป้าหมาย
+	# Targeted placement
 	if target_idx < 0 or target_idx >= target_inv.slots.size():
-		return false
+		return transfer_amount
 		
 	var target_slot = target_inv.slots[target_idx]
 	if target_slot.item != null:
-		# ถ้าเป้าหมายมีของอยู่ ต้องเป็นของชนิดเดียวกันและรวมกองได้
+		# Merge into existing stack
 		var t_owning = target_slot.get_owning_slot()
 		if t_owning.item != item or not item.stackable:
-			return false
+			return transfer_amount
 		var space = t_owning.get_max_stack(item) - t_owning.amount
-		if space < transfer_amount:
-			return false
-		t_owning.amount += transfer_amount
+		if space <= 0:
+			return transfer_amount
+		var actual = min(transfer_amount, space)
+		t_owning.amount += actual
+		var leftover = transfer_amount - actual
+		
+		# Deduct from source
+		source_slot.amount -= actual
+		if source_slot.amount <= 0:
+			var origin_idx = source_inv.slots.find(source_slot)
+			source_inv._set_occupied(origin_idx, source_slot.item, true)
+			source_slot.item = null
+			source_slot.amount = 0
+			source_slot.runtime_data.clear()
+			
+		source_inv.inventory_changed.emit()
+		target_inv.inventory_changed.emit()
+		return leftover + rejected_by_weight
 	else:
-		# ช่องว่าง เช็คพื้นที่
+		# Empty target slot
 		if not target_inv.can_place_item_at(item, target_idx):
-			return false
+			return transfer_amount
 		target_inv._set_occupied(target_idx, item, false)
 		target_slot.item = item
 		target_slot.amount = transfer_amount
 		target_slot.runtime_data = source_slot.runtime_data.duplicate(true)
 		
-	# หักจากต้นทาง
+	# Deduct from source
 	source_slot.amount -= transfer_amount
 	if source_slot.amount <= 0:
 		var origin_idx = source_inv.slots.find(source_slot)
@@ -382,4 +449,66 @@ static func transfer_item(source_inv: InventoryComponent, target_inv: InventoryC
 		
 	source_inv.inventory_changed.emit()
 	target_inv.inventory_changed.emit()
-	return true
+	return 0 + rejected_by_weight
+
+# ==========================================
+# Feature 2: Container API
+# ==========================================
+
+## Materializes an InventoryComponent from a container item's runtime_data.
+## Returns the instantiated and populated InventoryComponent.
+static func open_container(runtime_data: Dictionary, max_slots: int, max_weight: float = 0.0) -> InventoryComponent:
+	var inv = InventoryComponent.new()
+	inv.max_slots = max_slots
+	inv.max_weight = max_weight
+	inv.owner_instance_id = runtime_data.get("instance_id", -1)
+	inv._ready() # Initialize empty slots
+	
+	var slots_data = runtime_data.get("container_slots", [])
+	if slots_data.is_empty():
+		return inv
+		
+	# Deserialize the contents into the inventory
+	var registry = inv.get_registry()
+	for i in range(min(slots_data.size(), inv.slots.size())):
+		var s_data = slots_data[i]
+		if s_data == null or not s_data.has("item_id"):
+			continue
+			
+		var item_id = s_data["item_id"]
+		if item_id == "": continue
+		
+		var item_data = registry.get_item(StringName(item_id))
+		if item_data == null:
+			continue
+			
+		var slot = inv.slots[i]
+		slot.item = item_data
+		slot.amount = s_data.get("amount", 1)
+		slot.runtime_data = s_data.get("runtime_data", {})
+		
+		# Set occupancy for multi-cell items
+		inv._set_occupied(i, item_data, false, slot.runtime_data.get("rotated", false))
+		
+	return inv
+
+## Serializes a materialized container InventoryComponent back into its runtime_data.
+## Returns the serialized container_slots array.
+static func close_container(inv: InventoryComponent) -> Array:
+	var slots_data = []
+	for slot in inv.slots:
+		# Only serialize the top-left cell of an item
+		if slot.item != null and slot.occupied_by == null:
+			slots_data.append({
+				"item_id": slot.item.item_id,
+				"amount": slot.amount,
+				"runtime_data": slot.runtime_data
+			})
+		else:
+			slots_data.append(null)
+			
+	# Strip trailing nulls to save space
+	while slots_data.size() > 0 and slots_data.back() == null:
+		slots_data.pop_back()
+		
+	return slots_data

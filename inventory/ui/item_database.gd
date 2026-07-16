@@ -171,15 +171,22 @@ func _on_delete_button_pressed():
 		refresh_item_list()
 
 func _on_save_button_pressed():
+	if current_index != -1 and current_index < item_list.item_count:
+		var file_path = item_list.get_item_metadata(current_index)
+		# Load the item again from cache (which the inspector modified) and save it
+		var item = ResourceLoader.load(file_path, "", ResourceLoader.CACHE_MODE_REUSE)
+		if item:
+			ResourceSaver.save(item, file_path)
+			
 	_rebuild_registry()
 	refresh_item_list(search_input.text.strip_edges())
-	print("Item Database: Registry rebuilt and list refreshed.")
+	print("Item Database: Current item saved. Registry rebuilt and list refreshed.")
 
 # --- ITEM SELECTION ---
 func _on_item_list_item_selected(index: int):
 	current_index = index
 	var file_path = item_list.get_item_metadata(index)
-	var item = ResourceLoader.load(file_path, "", ResourceLoader.CACHE_MODE_IGNORE) as ItemData
+	var item = ResourceLoader.load(file_path, "", ResourceLoader.CACHE_MODE_REUSE) as ItemData
 	
 	if item:
 		EditorInterface.edit_resource(item)

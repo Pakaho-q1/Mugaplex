@@ -192,15 +192,16 @@ func test_transfer_item_api() -> void:
 	player_inv._set_occupied(0, item, false)
 	
 	# ย้ายยา 2 ขวด ไปกล่องสมบัติ แบบไม่ระบุช่อง
-	var success = InventoryAPI.transfer_item(player_inv, chest_inv, 0, -1, 2)
-	assert_true(success, "ต้องย้ายของสำเร็จ")
+	var leftover = InventoryAPI.transfer_item(player_inv, chest_inv, 0, -1, 2)
+	assert_eq(leftover, 0, "ต้องย้ายของสำเร็จ (leftover=0)")
 	
 	assert_eq(player_inv.slots[0].amount, 1, "ผู้เล่นต้องเหลือยา 1 ขวด")
 	assert_eq(chest_inv.slots[0].item, item, "กล่องต้องมียา 1 ช่อง")
 	assert_eq(chest_inv.slots[0].amount, 2, "กล่องต้องมียา 2 ขวด")
 	
 	# ย้ายส่วนที่เหลือทั้งหมดไปกล่องสมบัติ
-	success = InventoryAPI.transfer_item(player_inv, chest_inv, 0, -1, 1)
-	assert_true(success, "ต้องย้ายส่วนที่เหลือสำเร็จ")
+	leftover = InventoryAPI.transfer_item(player_inv, chest_inv, 0, -1, 1)
+	assert_eq(leftover, 0, "ต้องย้ายส่วนที่เหลือสำเร็จ (leftover=0)")
 	assert_null(player_inv.slots[0].item, "ผู้เล่นต้องไม่มียาแล้ว")
 	assert_eq(chest_inv.slots[0].amount, 3, "กล่องสมบัติต้องมียารวม 3 ขวด (รวมกองให้)")
+

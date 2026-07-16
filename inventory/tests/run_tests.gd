@@ -19,6 +19,8 @@ const TEST_SUITES: Array[Script] = [
 	preload("res://addons/mugaplex/inventory/tests/test_inventory_api.gd"),
 	preload("res://addons/mugaplex/inventory/tests/test_condition_manager.gd"),
 	preload("res://addons/mugaplex/inventory/tests/test_crafting.gd"),
+	preload("res://addons/mugaplex/inventory/tests/test_weight_constraint.gd"),
+	preload("res://addons/mugaplex/inventory/tests/test_container_module.gd"),
 ]
 
 

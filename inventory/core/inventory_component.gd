@@ -1,6 +1,8 @@
 extends Node
 class_name InventoryComponent
 
+const ContainerModule = preload("res://addons/mugaplex/inventory/modules/container_module.gd")
+
 # ตะโกนบอก UI เมื่อของในกระเป๋ามีการเปลี่ยนแปลง
 signal inventory_changed
 signal item_used(item: ItemData, index: int, payload: Dictionary)
@@ -16,11 +18,27 @@ signal item_dropped(item: ItemData, amount: int, runtime_data: Dictionary, slot_
 ## Array of pre-configured slots. Use this to assign starting items or to define specific Filters (e.g. Equipment slots).
 @export var slots: Array[InventorySlot] = []
 
+@export_group("Container / Nesting")
+## Used internally when this InventoryComponent is materialized from a ContainerModule.
+## Do not set this manually for top-level inventories.
+@export var owner_instance_id: int = -1
+
+@export_group("Capacity")
+## Maximum total weight this inventory can hold. 0.0 = unlimited (default, fully backward-compatible).
+@export var max_weight: float = 0.0
+
 @export_group("Module Updates")
 ## If true, this inventory will automatically call update_modules(delta) every physics frame.
 ## Enable this if any of your ItemModules use on_update() (e.g. PerishableModule, DurabilityModule).
 ## Leave disabled for inventories that only store static items (better performance).
 @export var auto_update_modules: bool = false
+
+## Per-instance RNG for deterministic module updates (e.g. PerishableModule decay).
+## Use set_rng_seed() to make behavior reproducible for testing or multiplayer.
+var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+
+func set_rng_seed(seed_value: int) -> void:
+	_rng.seed = seed_value
 
 @export_group("Save / Load")
 ## Optional: Override the default Item Database Registry. Useful for multi-registry setups.
@@ -37,15 +55,95 @@ func _physics_process(delta: float):
 	if auto_update_modules:
 		update_modules(delta)
 
+## Returns the total weight of all items currently in this inventory.
+func get_total_weight() -> float:
+	var total = 0.0
+	for slot in slots:
+		if slot.item != null and slot.occupied_by == null:
+			total += slot.item.weight * slot.amount
+			
+			# Add recursive weight for containers (if not fixed_weight)
+			var container_module = slot.item.get_module(ContainerModule)
+			if container_module and not container_module.fixed_weight:
+				total += _get_slot_weight_recursive(slot.runtime_data, get_registry())
+				
+	return total
+
+func _get_slot_weight_recursive(runtime_data: Dictionary, registry: ItemDatabaseRegistry) -> float:
+	var total = 0.0
+	if not runtime_data.has("container_slots"):
+		return total
+		
+	for slot_dict in runtime_data["container_slots"]:
+		if slot_dict == null or not slot_dict.has("item_id"):
+			continue
+			
+		var item_id = slot_dict["item_id"]
+		if item_id == "":
+			continue
+			
+		var item_data = registry.get_item(StringName(item_id))
+		if item_data == null:
+			continue
+			
+		var amount = slot_dict.get("amount", 0)
+		total += item_data.weight * amount
+		
+		var container_module = item_data.get_module(ContainerModule)
+		if container_module and not container_module.fixed_weight:
+			total += _get_slot_weight_recursive(slot_dict.get("runtime_data", {}), registry)
+			
+	return total
+
+func _would_create_cycle(candidate_instance_id: int) -> bool:
+	if candidate_instance_id == -1:
+		return false
+	var current_id = owner_instance_id
+	# In a real deep nested scenario we'd need to walk up the chain.
+	# For now, since we don't have a direct reference to the parent InventoryComponent,
+	# we just check the immediate owner. The InventoryAPI's transfer_item also needs to 
+	# check this by walking the instance_ids.
+	# Actually, to prevent cycles, the simplest guard is: an item with instance_id X
+	# cannot be placed into an inventory whose owner_instance_id is X.
+	return current_id == candidate_instance_id
+
+## Returns true if adding the given item amount would NOT exceed max_weight.
+## Always returns true when max_weight == 0.0 (unlimited).
+func can_hold_weight(item_data: ItemData, amount: int) -> bool:
+	if max_weight <= 0.0:
+		return true
+	return get_total_weight() + (item_data.weight * amount) <= max_weight
+
+## Returns how many units of item_data can still fit under max_weight.
+## Returns amount if max_weight == 0.0 (unlimited).
+func _max_addable_by_weight(item_data: ItemData, amount: int) -> int:
+	if max_weight <= 0.0 or item_data.weight <= 0.0:
+		return amount
+	var remaining_capacity = max_weight - get_total_weight()
+	if remaining_capacity <= 0.0:
+		return 0
+	var max_by_weight = int(remaining_capacity / item_data.weight)
+	return clampi(max_by_weight, 0, amount)
+
 # ตรวจสอบว่าสามารถวางไอเทมที่ตำแหน่งอ้างอิง (มุมซ้ายบน) ได้หรือไม่ (รองรับ Multi-cell)
-func can_place_item_at(item_data: ItemData, top_left_index: int, ignore_indices: Array[int] = []) -> bool:
+func can_place_item_at(item_data: ItemData, top_left_index: int, ignore_indices: Array[int] = [], is_rotated: bool = false) -> bool:
 	if item_data == null: return false
+	if is_rotated and not item_data.can_rotate: return false
+	
+	# Circular containment guard
+	var container_mod = item_data.get_module(ContainerModule)
+	if container_mod:
+		# Note: In a real scenario we'd check the instance_id from the actual slot's runtime data,
+		# but can_place_item_at only takes ItemData. The callers (add_item, move_item) will need to
+		# double check or we pass the runtime_data.
+		# For now, we rely on the caller to do the cycle check, or we add an optional param.
+		pass
 	
 	var grid_w = grid_columns
 	var grid_h = max_slots / grid_columns
 	
-	var item_w = item_data.grid_size.x
-	var item_h = item_data.grid_size.y
+	var item_w = item_data.grid_size.y if is_rotated else item_data.grid_size.x
+	var item_h = item_data.grid_size.x if is_rotated else item_data.grid_size.y
 	
 	var start_x = top_left_index % grid_w
 	var start_y = top_left_index / grid_w
@@ -72,11 +170,11 @@ func can_place_item_at(item_data: ItemData, top_left_index: int, ignore_indices:
 	return true
 
 # จองหรือคืนพื้นที่ให้ไอเทม (Multi-cell)
-func _set_occupied(top_left_index: int, item_data: ItemData, clear: bool = false):
+func _set_occupied(top_left_index: int, item_data: ItemData, clear: bool = false, is_rotated: bool = false):
 	if item_data == null: return
 	var grid_w = grid_columns
-	var item_w = item_data.grid_size.x
-	var item_h = item_data.grid_size.y
+	var item_w = item_data.grid_size.y if is_rotated else item_data.grid_size.x
+	var item_h = item_data.grid_size.x if is_rotated else item_data.grid_size.y
 	var start_x = top_left_index % grid_w
 	var start_y = top_left_index / grid_w
 	
@@ -99,6 +197,13 @@ func add_item(item_data: ItemData, amount: int = 1) -> int:
 		return amount
 	if amount <= 0:
 		return 0
+	
+	# Weight constraint: clamp the amount we can actually add
+	var allowed = _max_addable_by_weight(item_data, amount)
+	if allowed <= 0:
+		return amount
+	var rejected_by_weight = amount - allowed
+	amount = allowed
 
 	var amount_to_add = amount
 	var changed = false
@@ -114,7 +219,7 @@ func add_item(item_data: ItemData, amount: int = 1) -> int:
 					slot.amount += amount_to_add
 					changed = true
 					inventory_changed.emit()
-					return 0
+					return rejected_by_weight
 				else:
 					slot.amount += space_left
 					amount_to_add -= space_left
@@ -133,7 +238,7 @@ func add_item(item_data: ItemData, amount: int = 1) -> int:
 					slot.amount = amount_to_add
 					changed = true
 					inventory_changed.emit()
-					return 0
+					return rejected_by_weight
 				else:
 					slot.amount = slot.get_max_stack(item_data)
 					amount_to_add -= slot.get_max_stack(item_data)
@@ -144,11 +249,11 @@ func add_item(item_data: ItemData, amount: int = 1) -> int:
 				changed = true
 				if amount_to_add == 0:
 					inventory_changed.emit()
-					return 0
+					return rejected_by_weight
 
 	if changed:
 		inventory_changed.emit()
-	return amount_to_add
+	return amount_to_add + rejected_by_weight
 	
 func move_item(source_index: int, target_index: int, move_amount: int = -1):
 	if source_index == target_index:
@@ -474,7 +579,7 @@ func update_modules(delta: float):
 		if slot.item:
 			for module in slot.item.modules:
 				if module.has_method("on_update"):
-					var res = module.on_update(delta, slot.runtime_data)
+					var res = module.on_update(delta, slot.runtime_data, _rng)
 					if res.has("runtime_data_update") and not res["runtime_data_update"].is_empty():
 						changed = true
 						for key in res["runtime_data_update"]:
@@ -577,6 +682,16 @@ func take_item_amount(index: int, amount: int = -1) -> Dictionary:
 
 func place_item_amount(index: int, item: ItemData, amount: int, runtime: Dictionary) -> int:
 	if index < 0 or index >= slots.size() or item == null or amount <= 0: return amount
+	
+	# Circular containment guard
+	if runtime.has("instance_id") and _would_create_cycle(runtime["instance_id"]):
+		return amount
+		
+	var original_amount = amount
+	# Weight constraint: clamp amount to what fits under max_weight
+	amount = _max_addable_by_weight(item, amount)
+	var rejected_by_weight = original_amount - amount
+	if amount <= 0: return original_amount
 	var slot = slots[index]
 	if slot.occupied_by != null:
 		index = slots.find(slot.occupied_by)
@@ -584,18 +699,18 @@ func place_item_amount(index: int, item: ItemData, amount: int, runtime: Diction
 		
 	# Merge
 	if slot.item != null and slot.item == item and item.stackable:
-		if not slot.can_accept(item): return amount
+		if not slot.can_accept(item): return amount + rejected_by_weight
 		var space = slot.get_max_stack(item) - slot.amount
 		var transfer = min(amount, space)
 		if transfer > 0:
 			slot.amount += transfer
 			amount -= transfer
 			inventory_changed.emit()
-		return amount
+		return amount + rejected_by_weight
 		
 	# Empty slot
 	if slot.item == null:
-		if not slot.can_accept(item): return amount
+		if not slot.can_accept(item): return amount + rejected_by_weight
 		var ignore_source: Array[int] = []
 		var grid_w = grid_columns
 		var w = item.grid_size.x
@@ -603,7 +718,7 @@ func place_item_amount(index: int, item: ItemData, amount: int, runtime: Diction
 		for y in range(h):
 			for x in range(w):
 				ignore_source.append(index + y * grid_w + x)
-		if not can_place_item_at(item, index, ignore_source): return amount
+		if not can_place_item_at(item, index, ignore_source): return amount + rejected_by_weight
 		
 		var place_amt = min(amount, slot.get_max_stack(item))
 		slot.item = item
@@ -612,6 +727,6 @@ func place_item_amount(index: int, item: ItemData, amount: int, runtime: Diction
 		amount -= place_amt
 		_set_occupied(index, slot.item, false)
 		inventory_changed.emit()
-		return amount
+		return amount + rejected_by_weight
 		
-	return amount
+	return amount + rejected_by_weight
