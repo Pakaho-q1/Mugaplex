@@ -23,7 +23,13 @@ func test_craft_items_consumes_ingredients_and_adds_result() -> void:
 	
 	var registry = RecipeRegistry.new()
 	var recipe = ItemRecipe.new()
-	var ings: Array[ItemData] = [item_a, item_b]
+	var ing_a = RecipeIngredient.new()
+	ing_a.item_id = "wood"
+	ing_a.amount = 1
+	var ing_b = RecipeIngredient.new()
+	ing_b.item_id = "stone"
+	ing_b.amount = 1
+	var ings: Array[RecipeIngredient] = [ing_a, ing_b]
 	recipe.ingredients = ings
 	var axe = ItemData.new()
 	axe.item_id = "axe"

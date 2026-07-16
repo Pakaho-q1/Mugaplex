@@ -168,3 +168,26 @@ func test_stacking_math_and_ticks() -> void:
 	
 	cm.free()
 	target.free()
+
+func test_stacking_with_override() -> void:
+	var cm = ConditionManager.new()
+	var target = Node.new()
+	
+	var berserk = ConditionEffect.new()
+	berserk.stat_target = "attack_speed"
+	berserk.modifier_type = ConditionEffect.ModifierType.OVERRIDE
+	berserk.amount = 5.0
+	berserk.duration_seconds = 10.0
+	berserk.stacking_behavior = ConditionEffect.StackingBehavior.STACK
+	berserk.max_stacks = 3
+	
+	# Apply once -> override to 5
+	cm.apply_condition(berserk, target)
+	assert_eq(cm.get_modified_stat("attack_speed", 1.0, target), 5.0)
+	
+	# Apply second time -> 2 stacks, but override should STILL be 5 (not 10)
+	cm.apply_condition(berserk, target)
+	assert_eq(cm.get_modified_stat("attack_speed", 1.0, target), 5.0)
+	
+	cm.free()
+	target.free()

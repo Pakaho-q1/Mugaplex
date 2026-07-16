@@ -146,7 +146,7 @@ func get_modified_stat(stat_type: StringName, base_value: float, target: Node = 
 						# Highest priority wins. If tied, sequential override (latest wins)
 						if effect.priority >= highest_priority:
 							highest_priority = effect.priority
-							override_value = effective_amount
+							override_value = effect.amount
 							has_override = true
 
 	if has_override:

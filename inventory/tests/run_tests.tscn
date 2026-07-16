@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://addons/mugaplex/tests/run_tests.gd" id="1"]
+[ext_resource type="Script" uid="uid://cx60d62y1j1g4" path="res://addons/mugaplex/inventory/tests/run_tests.gd" id="1_4u60m"]
 
 [node name="RunTests" type="Node"]
-script = ExtResource("1")
+script = ExtResource("1_4u60m")
