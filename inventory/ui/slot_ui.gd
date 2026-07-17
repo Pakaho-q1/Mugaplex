@@ -24,23 +24,20 @@ class_name SlotUI
 @export var use_action_name: String = ""
 ## The InputMap action name to trigger 'Drop' (e.g. 'inventory_drop'). Leave empty to disable.
 @export var drop_action_name: String = ""
-## The InputMap action name to trigger 'Split' (e.g. 'inventory_split'). Leave empty to disable.
-@export var split_action_name: String = ""
+
+@export_group("Context Menu Settings")
+## Can this slot open a context menu when right clicked?
+@export var allow_context_menu: bool = true
 
 @export_group("Drag & Drop Settings")
 ## 0: Click to pick up/drop. 1: Hold to drag, release to drop. 2: Both (Hybrid).
 @export_enum("Click-to-Hold", "Hold-to-Drag", "Hybrid") var drag_mode: int = 2
-@export var drag_preview_size: Vector2 = Vector2(64, 64)
-## Optional: The parent container (e.g. Panel, MarginContainer) of your Icon and Amount Label. We will duplicate this to use as the drag preview. If left empty, a standard icon preview is used.
-@export var drag_preview_container_path: NodePath
-
-@export_group("Split Behavior")
+## The size of the preview when dragging the item (if not auto-scaling)
+@export var drag_preview_size: Vector2 = Vector2(40, 40)
+## If true, the drag preview automatically scales to match the item's grid size (Multi-Cell).
+@export var auto_drag_preview_size: bool = true
 ## Delay in milliseconds before picking up an item via click. Useful if 'use_on_double_click' is true to prevent instant pickup from breaking the double click. Set to 0 for instant pickup.
 @export var pickup_delay_ms: int = 150
-## If true, pressing the split button triggers the 'split_popup_requested' signal in InventoryUI instead of dragging half the stack.
-@export var use_custom_split_ui: bool = false
-## The math formula evaluated when splitting via drag (e.g. 'amount / 2' or 'amount - 1'). Ignored if use_custom_split_ui is true.
-@export var split_formula: String = "amount / 2"
 
 @onready var icon: TextureRect = get_node_or_null(icon_rect_path) if not icon_rect_path.is_empty() else get_node_or_null("Icon")
 @onready var amount_label: Label = get_node_or_null(amount_label_path) if not amount_label_path.is_empty() else get_node_or_null("AmountLabel")
@@ -81,10 +78,14 @@ func update_slot(slot_data: InventorySlot, index: int, comp: InventoryComponent,
 	# Opportunity 4 Fix: Performance / Partial Update simulation
 	# Avoid touching UI nodes if the data hasn't actually changed.
 	if icon and icon.texture == owning_slot.item.icon and amount_label and amount_label.text == (str(owning_slot.amount) if owning_slot.amount > 1 else ""):
-		return
+		pass
 		
-	if icon: icon.texture = owning_slot.item.icon
-	if amount_label: amount_label.text = str(owning_slot.amount) if owning_slot.amount > 1 else ""
+	# If InventoryUI uses Layer 2 (ItemVisualLayer), we don't draw anything in SlotUI
+	if inventory_ui and inventory_ui.get("visual_layer") != null:
+		_clear_display()
+	else:
+		if icon: icon.texture = owning_slot.item.icon
+		if amount_label: amount_label.text = str(owning_slot.amount) if owning_slot.amount > 1 else ""
 		
 func _clear_display():
 	if icon: icon.texture = null
@@ -121,32 +122,22 @@ func _handle_mouse_input(event: InputEvent):
 			handled_use = true
 			
 		if not handled_use and (event.button_index == MOUSE_BUTTON_LEFT or event.button_index == MOUSE_BUTTON_RIGHT):
-			if event.button_index == MOUSE_BUTTON_RIGHT and InventoryManager.cursor_item == null:
-				# Hand is empty, open context menu
-				InventoryManager.context_menu_requested.emit(inventory_component, internal_index, event.global_position, self)
+			if event.button_index == MOUSE_BUTTON_RIGHT and allow_context_menu and InventoryManager.cursor_item == null:
+				var slot_data = inventory_component.slots[internal_index]
+				var owning_slot = slot_data.get_owning_slot()
+				if owning_slot.item != null:
+					InventoryManager.context_menu_requested.emit(inventory_component, internal_index, get_viewport().get_mouse_position(), self)
 			else:
-				# Handle pickup, drop 1, swap, etc.
 				if event.button_index == MOUSE_BUTTON_LEFT and pickup_delay_ms > 0 and InventoryManager.cursor_item == null:
 					_cancel_pickup = false
 					await get_tree().create_timer(pickup_delay_ms / 1000.0).timeout
-					# Design Issue #7 Fix: guard against this node being freed while waiting
 					if not is_instance_valid(self): return
 					if _cancel_pickup: return
 				InventoryManager.handle_slot_click(inventory_component, internal_index, event, self)
-			
-	if split_action_name != "" and InputMap.has_action(split_action_name) and event.is_action_pressed(split_action_name):
-		_on_split_action()
 
 func _on_use_action():
 	if internal_index != -1 and inventory_ui and inventory_ui.has_method("request_use"):
 		inventory_ui.request_use(internal_index)
-
-func _on_split_action():
-	if use_custom_split_ui and internal_index != -1 and inventory_ui and inventory_ui.has_method("request_split_popup"):
-		var slot_data = inventory_component.slots[internal_index]
-		var owning_slot = slot_data.get_owning_slot()
-		if owning_slot.item != null:
-			inventory_ui.request_split_popup(internal_index, owning_slot.amount)
 
 func _on_transfer_action():
 	pass

@@ -50,6 +50,17 @@ func _ready():
 		slots.append(InventorySlot.new())
 	if slots.size() > max_slots:
 		slots.resize(max_slots)
+		
+	_initialize_occupied_cells()
+
+func _initialize_occupied_cells() -> void:
+	for slot in slots:
+		slot.occupied_by = null
+	for i in range(slots.size()):
+		var slot = slots[i]
+		if slot.item != null:
+			var is_rot = slot.runtime_data.get("rotated", false)
+			_set_occupied(i, slot.item, false, is_rot)
 
 func _physics_process(delta: float):
 	if auto_update_modules:
@@ -168,6 +179,29 @@ func can_place_item_at(item_data: ItemData, top_left_index: int, ignore_indices:
 				return false
 				
 	return true
+
+func get_overlapping_items(item_data: ItemData, top_left_index: int, is_rotated: bool = false) -> Array[InventorySlot]:
+	var overlaps: Array[InventorySlot] = []
+	if item_data == null: return overlaps
+	var grid_w = grid_columns
+	var grid_h = max_slots / grid_columns
+	var item_w = item_data.grid_size.y if is_rotated else item_data.grid_size.x
+	var item_h = item_data.grid_size.x if is_rotated else item_data.grid_size.y
+	var start_x = top_left_index % grid_w
+	var start_y = top_left_index / grid_w
+	if start_x + item_w > grid_w or start_y + item_h > grid_h:
+		return overlaps
+		
+	for y in range(item_h):
+		for x in range(item_w):
+			var idx = (start_y + y) * grid_w + (start_x + x)
+			if idx >= slots.size(): continue
+			var slot = slots[idx]
+			if slot.item != null or slot.occupied_by != null:
+				var owning = slot.get_owning_slot()
+				if not overlaps.has(owning):
+					overlaps.append(owning)
+	return overlaps
 
 # จองหรือคืนพื้นที่ให้ไอเทม (Multi-cell)
 func _set_occupied(top_left_index: int, item_data: ItemData, clear: bool = false, is_rotated: bool = false):
@@ -712,20 +746,21 @@ func place_item_amount(index: int, item: ItemData, amount: int, runtime: Diction
 	if slot.item == null:
 		if not slot.can_accept(item): return amount + rejected_by_weight
 		var ignore_source: Array[int] = []
+		var is_rotated = runtime.get("rotated", false)
 		var grid_w = grid_columns
-		var w = item.grid_size.x
-		var h = item.grid_size.y
+		var w = item.grid_size.y if is_rotated else item.grid_size.x
+		var h = item.grid_size.x if is_rotated else item.grid_size.y
 		for y in range(h):
 			for x in range(w):
 				ignore_source.append(index + y * grid_w + x)
-		if not can_place_item_at(item, index, ignore_source): return amount + rejected_by_weight
+		if not can_place_item_at(item, index, ignore_source, is_rotated): return amount + rejected_by_weight
 		
 		var place_amt = min(amount, slot.get_max_stack(item))
 		slot.item = item
 		slot.amount = place_amt
 		slot.runtime_data = runtime.duplicate(true)
 		amount -= place_amt
-		_set_occupied(index, slot.item, false)
+		_set_occupied(index, slot.item, false, is_rotated)
 		inventory_changed.emit()
 		return amount + rejected_by_weight
 		

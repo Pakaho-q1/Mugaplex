@@ -32,6 +32,8 @@ signal data_changed
 @export var weight: float = 0.0
 ## If false, this item can never be rotated in a grid inventory, even if the player requests it.
 @export var can_rotate: bool = true
+## If false, the visual icon of this item will not rotate 90 degrees even when its grid footprint is rotated. Useful for potions or round items.
+@export var rotate_visual: bool = true
 
 @export_group("Modules")
 ## Add modules here to define item behaviors (e.g. ConsumableModule, EquipmentModule).

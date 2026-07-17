@@ -8,16 +8,38 @@ const InventoryAPI = preload("res://addons/mugaplex/inventory/api/inventory_api.
 @export var inventory_component: InventoryComponent
 ## The Node that 'owns' this inventory (usually the Player). Used for passing Context when items are used.
 @export var user: Node
+@export_group("Multi-Cell Support")
+## The GridContainer used to calculate item positions and sizes for multi-cell items. If empty, tries to auto-detect.
+@export var grid_container: GridContainer
+## An optional pre-placed ItemVisualLayer node. If assigned, the system will use this instead of creating one dynamically, allowing you full control over its layout and positioning.
+@export var custom_visual_layer: ItemVisualLayer
+## Optional: A custom scene used for highlighting the grid (e.g. glowing border). Instantiated and resized over hovered slots.
+@export var custom_highlight_scene: PackedScene
+
 @export_group("Auto-Spawn (Optional)")
 ## If assigned, the UI will automatically spawn SlotUI children inside this container to match the InventoryComponent's max_slots.
 @export var auto_spawn_container: Control
 ## The scene to spawn for each slot if auto_spawn_container is used.
 @export var auto_spawn_template: PackedScene = SLOT_UI_SCENE
 var active_slots: Array[SlotUI] = []
+var visual_layer: ItemVisualLayer = null
 
 func _ready():
 	if not inventory_component:
 		inventory_component = InventoryManager.get_player()
+		
+	# Use user's custom visual layer if provided, else create dynamically
+	if custom_visual_layer:
+		visual_layer = custom_visual_layer
+		visual_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	else:
+		visual_layer = preload("res://addons/mugaplex/inventory/ui/item_visual_layer.gd").new()
+		visual_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(visual_layer)
+		
+	if visual_layer.has_method("set_custom_highlight_scene"):
+		visual_layer.set_custom_highlight_scene(custom_highlight_scene)
+		
 	if inventory_component:
 		setup(inventory_component)
 		
@@ -111,6 +133,18 @@ func update_slot_by_index(index: int):
 			slot.update_slot(slot_data, index, inventory_component, self)
 			break
 
+func get_closest_slot(global_pos: Vector2) -> Control:
+	var closest: Control = null
+	var min_dist = INF
+	for slot in active_slots:
+		if not is_instance_valid(slot): continue
+		var center = slot.global_position + slot.size / 2.0
+		var dist = global_pos.distance_squared_to(center)
+		if dist < min_dist:
+			min_dist = dist
+			closest = slot
+	return closest
+
 # อัปเดตข้อมูลและวาดหน้าจอใหม่
 func update_ui():
 	if not inventory_component:
@@ -123,6 +157,21 @@ func update_ui():
 			slot_data = inventory_component.slots[target_index]
 			
 		slot.update_slot(slot_data, target_index, inventory_component, self)
+
+	if visual_layer:
+		var grid: GridContainer = grid_container
+		if not grid:
+			if auto_spawn_container and auto_spawn_container is GridContainer:
+				grid = auto_spawn_container
+			elif active_slots.size() > 0 and active_slots[0].get_parent() is GridContainer:
+				grid = active_slots[0].get_parent() as GridContainer
+				
+		if grid:
+			# Only auto-snap position if we created the layer dynamically.
+			# If the user placed a custom_visual_layer, we respect their layout.
+			if not custom_visual_layer:
+				visual_layer.global_position = grid.global_position
+			visual_layer.refresh(inventory_component, grid)
 
 # --- ส่งผ่านการร้องขอ (Pass-through Requests) ไปยัง Core ---
 

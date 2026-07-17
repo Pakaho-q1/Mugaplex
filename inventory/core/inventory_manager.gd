@@ -58,34 +58,67 @@ func set_custom_cursor(source_slot: Control):
 		_cursor_icon_ref = null
 		_cursor_label_ref = null
 		
-	if source_slot.get("drag_preview_container_path") and not source_slot.drag_preview_container_path.is_empty():
-		var container = source_slot.get_node(source_slot.drag_preview_container_path)
-		if container:
-			_cursor_visual = container.duplicate(0)
-			_cursor_layer.add_child(_cursor_visual)
-			_disable_mouse_filter_recursive(_cursor_visual)
-			
-			if source_slot.icon:
-				var icon_path = container.get_path_to(source_slot.icon)
-				_cursor_icon_ref = _cursor_visual.get_node_or_null(icon_path) as TextureRect
-			
-			if source_slot.amount_label:
-				var label_path = container.get_path_to(source_slot.amount_label)
-				_cursor_label_ref = _cursor_visual.get_node_or_null(label_path) as Label
-				
-	# Fallback
-	if not _cursor_visual:
-		_cursor_visual = TextureRect.new()
-		_cursor_visual.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		_cursor_visual.custom_minimum_size = source_slot.drag_preview_size
-		_cursor_visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_cursor_layer.add_child(_cursor_visual)
-		_cursor_icon_ref = _cursor_visual
+	var cell_size = source_slot.size
+	var h_sep = 0
+	var v_sep = 0
+	if source_slot.get_parent() is GridContainer:
+		h_sep = source_slot.get_parent().get_theme_constant("h_separation")
+		v_sep = source_slot.get_parent().get_theme_constant("v_separation")
 		
-		_cursor_label_ref = Label.new()
-		_cursor_label_ref.position = Vector2(0, source_slot.drag_preview_size.y * 0.5)
-		_cursor_label_ref.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_cursor_visual.add_child(_cursor_label_ref)
+	var drag_size = source_slot.drag_preview_size
+	var is_auto = true
+	if "auto_drag_preview_size" in source_slot:
+		is_auto = source_slot.auto_drag_preview_size
+		
+	if cursor_item and is_auto:
+		var is_rot = cursor_runtime.get("rotated", false)
+		var item_w = cursor_item.grid_size.y if is_rot else cursor_item.grid_size.x
+		var item_h = cursor_item.grid_size.x if is_rot else cursor_item.grid_size.y
+		drag_size = Vector2(
+			(item_w * cell_size.x) + (max(0, item_w - 1) * h_sep),
+			(item_h * cell_size.y) + (max(0, item_h - 1) * v_sep)
+		)
+		
+	# Create a clean Control as the root of the drag preview
+	_cursor_visual = Control.new()
+	_cursor_visual.custom_minimum_size = drag_size
+	_cursor_visual.size = drag_size
+	_cursor_visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cursor_layer.add_child(_cursor_visual)
+	
+	_cursor_icon_ref = TextureRect.new()
+	_cursor_icon_ref.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_cursor_icon_ref.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_cursor_icon_ref.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cursor_visual.add_child(_cursor_icon_ref)
+	
+	if cursor_item:
+		var is_rot = cursor_runtime.get("rotated", false)
+		if is_rot and cursor_item.rotate_visual:
+			_cursor_icon_ref.rotation_degrees = 90
+			var orig_w = cursor_item.grid_size.x * cell_size.x + max(0, cursor_item.grid_size.x - 1) * h_sep
+			var orig_h = cursor_item.grid_size.y * cell_size.y + max(0, cursor_item.grid_size.y - 1) * v_sep
+			if not is_auto:
+				orig_w = drag_size.y
+				orig_h = drag_size.x
+			_cursor_icon_ref.size = Vector2(orig_w, orig_h)
+			_cursor_icon_ref.position = (drag_size - _cursor_icon_ref.size) / 2.0
+			_cursor_icon_ref.pivot_offset = _cursor_icon_ref.size / 2.0
+		else:
+			_cursor_icon_ref.rotation_degrees = 0
+			_cursor_icon_ref.size = drag_size
+			_cursor_icon_ref.position = Vector2.ZERO
+			
+	_cursor_label_ref = Label.new()
+	_cursor_label_ref.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cursor_label_ref.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_cursor_label_ref.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	_cursor_label_ref.add_theme_color_override("font_outline_color", Color(0,0,0,1))
+	_cursor_label_ref.add_theme_constant_override("outline_size", 4)
+	
+	_cursor_label_ref.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	_cursor_label_ref.position = Vector2(drag_size.x - 40, drag_size.y - 23) # default offset
+	_cursor_visual.add_child(_cursor_label_ref)
 
 func _disable_mouse_filter_recursive(node: Node):
 	if node is Control:
@@ -93,23 +126,37 @@ func _disable_mouse_filter_recursive(node: Node):
 	for child in node.get_children():
 		_disable_mouse_filter_recursive(child)
 
+var current_context_receiver: Node = null
+
 func handle_slot_click(inv: InventoryComponent, slot_index: int, event: InputEventMouseButton, source_slot: Control) -> void:
 	if inv == null or slot_index < 0: return
 	var target_slot = inv.slots[slot_index]
 	var target_owning = target_slot.get_owning_slot()
 	var real_index = inv.slots.find(target_owning)
 	
-	var split_action_name = source_slot.split_action_name if "split_action_name" in source_slot else ""
-	var split_formula = source_slot.split_formula if "split_formula" in source_slot else "amount / 2"
-	
-	# Check if holding split modifier
+	var split_action_name = ""
+	var split_formula = "amount / 2"
+	if current_context_receiver:
+		split_action_name = current_context_receiver.get("split_action_name") if "split_action_name" in current_context_receiver else ""
+		split_formula = current_context_receiver.get("split_formula") if "split_formula" in current_context_receiver else "amount / 2"
+		
 	var is_split = (split_action_name != "" and InputMap.has_action(split_action_name) and Input.is_action_pressed(split_action_name))
 
 	if event.button_index == MOUSE_BUTTON_LEFT:
 		if cursor_item == null:
 			# Pickup
 			if target_owning.item != null:
-				var payload = inv.take_item_amount(real_index, target_owning.amount)
+				var take_amt = target_owning.amount
+				if is_split:
+					# Split pickup
+					var expr = Expression.new()
+					var error = expr.parse(split_formula, ["amount"])
+					if error == OK:
+						var result = expr.execute([take_amt])
+						if not expr.has_execute_failed():
+							take_amt = clampi(int(result), 1, take_amt)
+				
+				var payload = inv.take_item_amount(real_index, take_amt)
 				cursor_item = payload["item"]
 				cursor_amount = payload["amount"]
 				cursor_runtime = payload["runtime_data"]
@@ -129,6 +176,28 @@ func handle_slot_click(inv: InventoryComponent, slot_index: int, event: InputEve
 						cursor_item = null
 						cursor_runtime.clear()
 					update_cursor_visual()
+				elif not is_split and target_owning.item == null and inv.has_method("get_overlapping_items"):
+					# Place failed on an empty slot. Check if exactly 1 item is in the way (Multi-cell Swap)
+					var overlaps = inv.get_overlapping_items(cursor_item, real_index, cursor_runtime.get("rotated", false))
+					if overlaps.size() == 1:
+						var swap_slot = overlaps[0]
+						var swap_index = inv.slots.find(swap_slot)
+						var temp_item = swap_slot.item
+						var temp_amount = swap_slot.amount
+						var temp_runtime = swap_slot.runtime_data.duplicate(true)
+						
+						var payload = inv.take_item_amount(swap_index, temp_amount)
+						var re_left_over = inv.place_item_amount(real_index, cursor_item, cursor_amount, cursor_runtime)
+						
+						if re_left_over == 0:
+							cursor_item = temp_item
+							cursor_amount = temp_amount
+							cursor_runtime = temp_runtime
+							if source_slot: set_custom_cursor(source_slot)
+							update_cursor_visual()
+						else:
+							# Revert
+							inv.place_item_amount(swap_index, payload["item"], payload["amount"], payload["runtime_data"])
 			else:
 				# Swap
 				if not is_split: # Full swap only
@@ -230,6 +299,13 @@ func _input(event):
 								handle_slot_click(hovered_slot.inventory_component, hovered_slot.internal_index, event, hovered_slot)
 						else:
 							if hovered_inventory_ui != null and is_instance_valid(hovered_inventory_ui):
+								if hovered_inventory_ui.has_method("get_closest_slot"):
+									var closest = hovered_inventory_ui.get_closest_slot(event.global_position)
+									if closest:
+										var mode = closest.get("drag_mode")
+										if mode == null or mode != 0:
+											handle_slot_click(closest.inventory_component, closest.internal_index, event, closest)
+										return
 								return_cursor_to_source()
 								get_viewport().set_input_as_handled()
 							else:
@@ -257,11 +333,14 @@ func return_cursor_to_source():
 
 func drop_cursor_to_ground():
 	if cursor_item != null:
-		item_dropped.emit(cursor_item, cursor_amount, cursor_runtime)
-		cursor_item = null
-		cursor_amount = 0
-		cursor_runtime.clear()
-		update_cursor_visual()
+		if item_dropped.get_connections().size() > 0:
+			item_dropped.emit(cursor_item, cursor_amount, cursor_runtime)
+			cursor_item = null
+			cursor_amount = 0
+			cursor_runtime.clear()
+			update_cursor_visual()
+		else:
+			return_cursor_to_source()
 
 
 
