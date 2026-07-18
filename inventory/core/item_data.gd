@@ -45,6 +45,17 @@ func get_module(module_class: Script) -> ItemModule:
 			return module
 	return null
 
+func get_module_by_name(class_name_str: String) -> ItemModule:
+	for module in modules:
+		if module != null and module.get_script().resource_path.get_file().trim_suffix(".gd") == class_name_str.to_snake_case():
+			return module
+		elif module != null and str(module.get_script().get_global_name()) == class_name_str:
+			return module
+	return null
+
+func has_module_by_name(class_name_str: String) -> bool:
+	return get_module_by_name(class_name_str) != null
+
 func notify_changed() -> void:
 	data_changed.emit()
 

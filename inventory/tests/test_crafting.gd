@@ -24,10 +24,10 @@ func test_craft_items_consumes_ingredients_and_adds_result() -> void:
 	var registry = RecipeRegistry.new()
 	var recipe = ItemRecipe.new()
 	var ing_a = RecipeIngredient.new()
-	ing_a.item_id = "wood"
+	ing_a.item = item_a
 	ing_a.amount = 1
 	var ing_b = RecipeIngredient.new()
-	ing_b.item_id = "stone"
+	ing_b.item = item_b
 	ing_b.amount = 1
 	var ings: Array[RecipeIngredient] = [ing_a, ing_b]
 	recipe.ingredients = ings
@@ -38,7 +38,7 @@ func test_craft_items_consumes_ingredients_and_adds_result() -> void:
 	registry.recipes.append(recipe)
 	
 	var result = InventoryAPI.craft_items(inv, registry, [0, 1])
-	assert_true(result, "Crafting should succeed")
+	assert_true(result.success, "Crafting should succeed")
 	
 	assert_null(inv.slots[1].item, "Slot 1 should be empty")
 	

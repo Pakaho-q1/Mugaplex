@@ -18,14 +18,12 @@ class_name InventorySlot
 ## Overrides the item's max stack limit for this specific slot (e.g. set to 1 for equipment slots). Set to 0 to use the item's default limit.
 @export var max_amount_override: int = 0
 # คืนค่าจำนวนสูงสุดที่ช่องนี้จะเก็บไอเทมชนิดนั้นๆ ได้
+# คืนค่าจำนวนสูงสุดที่ช่องนี้จะเก็บไอเทมชนิดนั้นๆ ได้
 func get_max_stack(item_data: ItemData) -> int:
 	if item_data == null: return 0
 	if max_amount_override > 0:
 		return min(max_amount_override, item_data.max_stack)
 	return item_data.max_stack
-
-# ตัวแปรระบุว่าช่องนี้ถูกช่องหลักอื่นจองไว้ (สล๊อตไอเทมขนาดใหญ่)
-var occupied_by: InventorySlot = null
 
 # ค่าสถานะที่ "เปลี่ยนแปลงได้เฉพาะชิ้นนี้" (เช่น durability ปัจจุบัน, ความสด)
 var runtime_data: Dictionary = {}
@@ -41,23 +39,9 @@ func init_runtime(item_data: ItemData) -> void:
 			for key in defaults:
 				runtime_data[key] = defaults[key]
 
-# ดึงช่องเจ้าของข้อมูลจริง (หากตัวเองเป็นช่องที่ถูกจอง จะชี้ไปยังสล็อตหลัก)
-func get_owning_slot() -> InventorySlot:
-	if occupied_by != null:
-		return occupied_by
-	return self
-
-# เช็คว่าตัวเองเป็นช่องที่ถูกจองไว้หรือไม่
-func is_occupied_cell() -> bool:
-	return occupied_by != null
-
 # เช็คสิทธิ์ตามกฎความเข้ากันได้ว่าสล็อตนี้สามารถรับไอเทมได้หรือไม่ (Pure Calculation)
 func can_accept(item_data: ItemData) -> bool:
 	if item_data == null:
-		return false
-		
-	# หากช่องนี้ถูกจองไว้โดยไอเทมชิ้นอื่นแล้ว จะไม่สามารถรับของใหม่ได้
-	if occupied_by != null:
 		return false
 		
 	# ตรวจสอบว่าไอเทมมี Category ตรงกับที่สล็อตอนุญาตหรือไม่ (ถ้ามีการตั้งค่าไว้)
@@ -87,4 +71,31 @@ func can_accept(item_data: ItemData) -> bool:
 			
 	return true
 
+# --- Serialization for Multiplayer ---
 
+func serialize() -> Dictionary:
+	var dict = {}
+	if item != null:
+		dict["item_id"] = item.id
+		dict["amount"] = amount
+		# Only serialize runtime_data if it's not empty to save bandwidth
+		if not runtime_data.is_empty():
+			dict["runtime_data"] = runtime_data
+	return dict
+
+func deserialize(dict: Dictionary, registry) -> void:
+	if dict.has("item_id") and registry != null:
+		var item_id = dict["item_id"]
+		var item_def = registry.get_item(StringName(item_id))
+		if item_def != null:
+			item = item_def
+			amount = dict.get("amount", 1)
+			runtime_data = dict.get("runtime_data", {})
+		else:
+			item = null
+			amount = 0
+			runtime_data = {}
+	else:
+		item = null
+		amount = 0
+		runtime_data = {}

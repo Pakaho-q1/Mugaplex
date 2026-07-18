@@ -5,7 +5,7 @@ class_name InventoryAPI
 static func rotate_item(inventory: InventoryComponent, slot_index: int) -> bool:
 	if not inventory or slot_index < 0 or slot_index >= inventory.slots.size():
 		return false
-	var slot = inventory.slots[slot_index].get_owning_slot()
+	var slot = inventory.get_owning_slot(slot_index)
 	if not slot or not slot.item:
 		return false
 	if not slot.item.can_rotate:
@@ -62,7 +62,7 @@ static func drop_item(inventory: InventoryComponent, index: int, amount: int = -
 		return false
 		
 	var slot = inventory.slots[index]
-	var owning_slot = slot.get_owning_slot()
+	var owning_slot = inventory.get_owning_slot(index)
 	if not owning_slot or not owning_slot.item:
 		return false
 		
@@ -85,7 +85,7 @@ static func drop_item(inventory: InventoryComponent, index: int, amount: int = -
 	inventory.inventory_changed.emit()
 	
 	# ให้เกมเอาไป spawn โมเดลที่พื้น
-	InventoryManager.item_dropped.emit(item, drop_amount, dropped_runtime_data)
+	# InventoryManager.item_dropped.emit(item, drop_amount, dropped_runtime_data)
 	return true
 
 ## คราฟต์ไอเทมในกระเป๋า (Item Crafting)
@@ -105,7 +105,7 @@ static func craft_items(inventory: InventoryComponent, registry: RecipeRegistry,
 	for idx in slot_indices:
 		if idx < 0 or idx >= inventory.slots.size():
 			continue
-		var slot = inventory.slots[idx].get_owning_slot()
+		var slot = inventory.get_owning_slot(idx)
 		if not slot or not slot.item:
 			continue
 		var id = slot.item.item_id
@@ -146,7 +146,7 @@ static func craft_items(inventory: InventoryComponent, registry: RecipeRegistry,
 		for idx in slot_item_map.get(id, []):
 			if to_remove <= 0:
 				break
-			var slot = inventory.slots[idx].get_owning_slot()
+			var slot = inventory.get_owning_slot(idx)
 			if not slot or not slot.item or slot.item.item_id != id:
 				continue
 			var take = min(slot.amount, to_remove)
@@ -182,7 +182,7 @@ static func split_stack(inventory: InventoryComponent, source_idx: int, target_i
 	if source_idx < 0 or source_idx >= inventory.slots.size() or target_idx < 0 or target_idx >= inventory.slots.size():
 		return false
 		
-	var source_slot = inventory.slots[source_idx].get_owning_slot()
+	var source_slot = inventory.get_owning_slot(source_idx)
 	var target_slot = inventory.slots[target_idx]
 	
 	if not source_slot.item or source_slot.amount <= amount:
@@ -193,7 +193,7 @@ static func split_stack(inventory: InventoryComponent, source_idx: int, target_i
 		
 	# เช็คว่าเป้าหมายว่าง หรือเป็นไอเทมเดียวกัน
 	if target_slot.item != null:
-		var t_owning = target_slot.get_owning_slot()
+		var t_owning = inventory.get_owning_slot(target_idx)
 		if t_owning.item != source_slot.item:
 			return false # ไอเทมคนละประเภท
 		var space_left = t_owning.get_max_stack(t_owning.item) - t_owning.amount
@@ -224,7 +224,7 @@ static func sort_inventory(inventory: InventoryComponent) -> void:
 	var collected_items: Array[Dictionary] = []
 	for i in range(inventory.slots.size()):
 		var slot = inventory.slots[i]
-		var owning_slot = slot.get_owning_slot()
+		var owning_slot = inventory.get_owning_slot(i)
 		
 		# ถ้ามันเป็นช่องหลักและมีของ
 		if owning_slot == slot and slot.item != null:
@@ -316,8 +316,9 @@ static func has_item_amount(inventory: InventoryComponent, item: ItemData, amoun
 		return false
 		
 	var total = 0
-	for slot in inventory.slots:
-		var owning_slot = slot.get_owning_slot()
+	for i in range(inventory.slots.size()):
+		var slot = inventory.slots[i]
+		var owning_slot = inventory.get_owning_slot(i)
 		if owning_slot == slot and slot.item == item:
 			total += slot.amount
 			if total >= amount:
@@ -338,7 +339,7 @@ static func consume_item(inventory: InventoryComponent, item: ItemData, amount: 
 	var remaining = amount
 	for i in range(inventory.slots.size()):
 		var slot = inventory.slots[i]
-		var owning_slot = slot.get_owning_slot()
+		var owning_slot = inventory.get_owning_slot(i)
 		if owning_slot == slot and slot.item == item:
 			if slot.amount <= remaining:
 				remaining -= slot.amount
@@ -364,7 +365,7 @@ static func transfer_item(source_inv: InventoryComponent, target_inv: InventoryC
 	if not source_inv or not target_inv or source_idx < 0 or source_idx >= source_inv.slots.size():
 		return amount if amount > 0 else 0
 		
-	var source_slot = source_inv.slots[source_idx].get_owning_slot()
+	var source_slot = source_inv.get_owning_slot(source_idx)
 	if not source_slot or not source_slot.item:
 		return amount if amount > 0 else 0
 		
@@ -407,7 +408,7 @@ static func transfer_item(source_inv: InventoryComponent, target_inv: InventoryC
 	var target_slot = target_inv.slots[target_idx]
 	if target_slot.item != null:
 		# Merge into existing stack
-		var t_owning = target_slot.get_owning_slot()
+		var t_owning = target_inv.get_owning_slot(target_idx)
 		if t_owning.item != item or not item.stackable:
 			return transfer_amount
 		var space = t_owning.get_max_stack(item) - t_owning.amount
@@ -498,7 +499,7 @@ static func close_container(inv: InventoryComponent) -> Array:
 	var slots_data = []
 	for slot in inv.slots:
 		# Only serialize the top-left cell of an item
-		if slot.item != null and slot.occupied_by == null:
+		if slot.item != null and slot.occupied_by_index == -1:
 			slots_data.append({
 				"item_id": slot.item.item_id,
 				"amount": slot.amount,

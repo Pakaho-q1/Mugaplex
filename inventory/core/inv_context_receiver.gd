@@ -83,39 +83,28 @@ func _ready():
 	InventoryManager.context_menu_requested.connect(_on_context_menu_requested)
 
 func _input(event):
+	if event.is_action_pressed("ui_cancel") and menu_container and menu_container.visible:
+		close_menu()
+		get_viewport().set_input_as_handled()
+		return
+		
 	if rotate_action_name != "" and event.is_action_pressed(rotate_action_name):
 		# Priority 1: Rotate item on cursor
-		if InventoryManager.cursor_item != null and InventoryManager.cursor_item.can_rotate:
-			InventoryManager.cursor_runtime["rotated"] = not InventoryManager.cursor_runtime.get("rotated", false)
+		if InventoryManager.has_cursor_item() and InventoryManager.get_cursor_item().can_rotate:
+			var rot = InventoryManager.cursor.runtime.get("rotated", false)
+			InventoryManager.cursor.runtime["rotated"] = not rot
 			InventoryManager.update_cursor_visual()
 			get_viewport().set_input_as_handled()
 		# Priority 2: Rotate item in hovered slot
-		elif InventoryManager.hovered_slot != null:
-			var inv = InventoryManager.hovered_slot.inventory_component
-			var idx = InventoryManager.hovered_slot.internal_index
+		elif InventoryManager.get("_hovered_slot_ui") != null:
+			var hovered = InventoryManager.get("_hovered_slot_ui")
+			var inv = hovered.get("inventory_component")
+			var idx = hovered.get("internal_index")
 			var slot = inv.get_slot(idx)
 			if slot and slot.item != null and slot.item.can_rotate:
-				# We just toggle rotation and let it fail if no room
-				var is_rot = slot.runtime_data.get("rotated", false)
-				slot.runtime_data["rotated"] = not is_rot
-				
-				# Check if it fits
-				var ignore = []
-				for y in range(slot.item.grid_size.y if is_rot else slot.item.grid_size.x):
-					for x in range(slot.item.grid_size.x if is_rot else slot.item.grid_size.y):
-						ignore.append(idx + y * inv.grid_columns + x)
-						
-				if not inv.can_place_item_at(slot.item, idx, ignore, not is_rot):
-					# Revert if it doesn't fit
-					slot.runtime_data["rotated"] = is_rot
-				else:
-					# Force refresh by removing and adding it back
-					var amount = slot.amount
-					var item = slot.item
-					var runtime = slot.runtime_data.duplicate(true)
-					inv.take_item_amount(idx, amount)
-					inv.place_item_amount(idx, item, amount, runtime)
-				
+				# Use API for rotation
+				var InventoryAPI = preload("res://addons/mugaplex/inventory/api/inventory_api.gd")
+				InventoryAPI.rotate_item(inv, idx)
 				get_viewport().set_input_as_handled()
 				
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:

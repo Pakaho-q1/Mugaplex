@@ -65,14 +65,9 @@ func equip_from_inventory(inventory: InventoryComponent, inv_index: int, slot: E
 	eq_slot.runtime_data = inv_slot.runtime_data.duplicate(true)
 	
 	# ลดจำนวนใน inventory
-	if inv_slot.is_occupied_cell():
-		# ถ้าคลิกช่องลูก ต้องลดจากช่องหลักแทน
-		inv_slot = inv_slot.get_owning_slot()
-		inv_index = inventory.slots.find(inv_slot)
-		
 	inv_slot.amount -= 1
 	if inv_slot.amount <= 0:
-		inventory._set_occupied(inv_index, inv_slot.item, true)
+		inventory._on_item_removed(inv_index, inv_slot.item)
 		inv_slot.item = null
 		inv_slot.runtime_data.clear()
 	
@@ -91,7 +86,7 @@ func unequip_to_inventory(inventory: InventoryComponent, slot: EquipSlot) -> boo
 	# ค้นหาช่องว่างใน Inventory เพื่อเอาอุปกรณ์ไปใส่
 	var target_index = -1
 	for i in range(inventory.slots.size()):
-		if inventory.can_place_item_at(item, i):
+		if inventory._can_add_item_with_constraints(item, i):
 			target_index = i
 			break
 			
@@ -100,7 +95,7 @@ func unequip_to_inventory(inventory: InventoryComponent, slot: EquipSlot) -> boo
 		return false
 	
 	var target_slot = inventory.slots[target_index]
-	inventory._set_occupied(target_index, item, false)
+	inventory._on_item_added(target_index, item)
 	
 	# ย้ายไอเทมไปยังช่องว่าง
 	target_slot.item = item

@@ -21,11 +21,12 @@ const TEST_SUITES: Array[Script] = [
 	preload("res://addons/mugaplex/inventory/tests/test_crafting.gd"),
 	preload("res://addons/mugaplex/inventory/tests/test_weight_constraint.gd"),
 	preload("res://addons/mugaplex/inventory/tests/test_container_module.gd"),
+	preload("res://addons/mugaplex/inventory/tests/test_inventory_network_wrapper.gd"),
 ]
 
 
 func _ready() -> void:
-	run_all_tests()
+	call_deferred("run_all_tests")
 
 
 func run_all_tests() -> void:
